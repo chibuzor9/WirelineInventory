@@ -1,6 +1,36 @@
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
+
+export function serveStatic(app: Express) {
+    // In production, the build output is structured differently
+    // Check for both possible paths
+    let distPath = path.resolve(import.meta.dirname, "public");
+
+    // If running from dist/index.js, the public folder is at dist/public
+    if (!fs.existsSync(distPath)) {
+        distPath = path.resolve(import.meta.dirname, "..", "dist", "public");
+    }
+
+    // If still not found, try relative to the current working directory
+    if (!fs.existsSync(distPath)) {
+        distPath = path.resolve(process.cwd(), "dist", "public");
+    }
+
+    if (!fs.existsSync(distPath)) {
+        console.error(`Could not find the build directory. Tried:
+        - ${ path.resolve(import.meta.dirname, "public") }
+        - ${ path.resolve(import.meta.dirname, "..", "dist", "public") }
+        - ${ path.resolve(process.cwd(), "dist", "public") }`);
+        throw new Error(
+            `Could not find the build directory: ${ distPath }, make sure to build the client first`,
+        );
+    }
+
+    console.log(`Serving static files from: ${ distPath }`);
+    app.use(express.static(distPath));
+}
+
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
@@ -67,7 +97,7 @@ export async function setupVite(app: Express, server: Server) {
     });
 }
 
-export function serveStatic(app: Express) {
+export function serveStaticProduction(app: Express) {
     const distPath = path.resolve(import.meta.dirname, "public");
 
     if (!fs.existsSync(distPath)) {
