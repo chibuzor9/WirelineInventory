@@ -36,12 +36,27 @@ export default function ReportGenerator() {
                 endDate,
                 format,
             });
-            return response.json();
+
+            // Handle PDF download
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `wireline-report-${reportType}-${new Date().toISOString().split('T')[0]}.pdf`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+                return { success: true };
+            } else {
+                throw new Error('Failed to generate report');
+            }
         },
         onSuccess: () => {
             toast({
                 title: 'Report generated',
-                description: 'Your report has been generated successfully.',
+                description: 'Your report has been downloaded successfully.',
             });
             queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
         },

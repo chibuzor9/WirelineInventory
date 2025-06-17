@@ -154,7 +154,7 @@ export class SupabaseStorage implements IStorage {
         let query = supabase.from('tools').select('*', { count: 'exact' });
         if (options?.status) query = query.eq('status', options.status);
         if (options?.category) query = query.eq('category', options.category);
-        if (options?.search) query = query.ilike('name', `%${options.search}%`);
+        if (options?.search) query = query.ilike('name', `%${ options.search }%`);
         if (options?.limit) query = query.limit(options.limit);
         if (options?.offset)
             query = query.range(
@@ -216,11 +216,11 @@ export class SupabaseStorage implements IStorage {
             .insert([activity])
             .select()
             .single();
-            
+
         if (error || !data) {
             throw new Error(
                 'Error creating activity: ' +
-                    (error?.message || 'Unknown error'),
+                (error?.message || 'Unknown error'),
             );
         }
         return data as Activity;
@@ -255,15 +255,15 @@ export class SupabaseStorage implements IStorage {
         const [usersResult, toolsResult] = await Promise.all([
             userIds.length > 0
                 ? supabase
-                      .from('users')
-                      .select('id, username, full_name')
-                      .in('id', userIds)
+                    .from('users')
+                    .select('id, username, full_name')
+                    .in('id', userIds)
                 : { data: [], error: null },
             toolIds.length > 0
                 ? supabase
-                      .from('tools')
-                      .select('id, tool_id, name, status')
-                      .in('id', toolIds)
+                    .from('tools')
+                    .select('id, tool_id, name, status')
+                    .in('id', toolIds)
                 : { data: [], error: null },
         ]);
 
@@ -300,6 +300,35 @@ export class SupabaseStorage implements IStorage {
             if (tool.status === 'white') stats.white++;
         }
         return stats;
+    }
+
+    async getToolsForReport(filters: {
+        tags?: string[];
+        startDate?: string;
+        endDate?: string;
+    }): Promise<Tool[]> {
+        let query = supabase.from('tools').select('*');
+
+        // Filter by tags (status)
+        if (filters.tags && filters.tags.length > 0) {
+            query = query.in('status', filters.tags);
+        }
+
+        // Filter by date range
+        if (filters.startDate) {
+            query = query.gte('lastUpdated', filters.startDate);
+        }
+        if (filters.endDate) {
+            query = query.lte('lastUpdated', filters.endDate);
+        }
+
+        const { data, error } = await query.order('toolId', { ascending: true });
+
+        if (error) {
+            throw new Error('Error fetching tools for report: ' + error.message);
+        }
+
+        return data as Tool[];
     }
 }
 

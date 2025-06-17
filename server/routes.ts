@@ -72,12 +72,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                         `[LOGIN FAIL] username: ${ username } (wrong password)`,
                     );
                     return res.status(401).send('Invalid username or password');
-                }
-
-                // Store userId in session
-                req.session.userId = user.id;
-                console.log(
-                    `[LOGIN SUCCESS] username: ${ username }, id: ${ user.id }`,
+                }                // Store userId in session
+                req.session.userId = Number(user.id); console.log(
+                    `[LOGIN SUCCESS] username: ${ username }, id: ${ Number(user.id) }`,
                 );
                 res.json(user);
             } catch (error) {
@@ -220,12 +217,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     lastUpdatedBy: Number(user.id),
                 };
 
-                const tool = await storage.createTool(toolData);
-
-                await storage.createActivity({
+                const tool = await storage.createTool(toolData); await storage.createActivity({
                     user_id: Number(user.id),
                     action: 'create',
-                    tool_id: tool.id,
+                    toolId: tool.id,
                     timestamp: new Date(),
                     details: `Created tool ${ tool.name } (${ tool.toolId }) with ${ tool.status } tag`,
                 });
@@ -292,7 +287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     await storage.createActivity({
                         user_id: Number(user.id),
                         action: 'update',
-                        tool_id: id,
+                        toolId: id,
                         timestamp: new Date(),
                         details: `Changed tag for ${ updatedTool?.name } (${ updatedTool?.toolId }) from ${ existingTool.status } to ${ req.body.status }`,
                         comments: req.body.comment || '',
@@ -302,7 +297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     await storage.createActivity({
                         user_id: Number(user.id),
                         action: 'update',
-                        tool_id: id,
+                        toolId: id,
                         timestamp: new Date(),
                         details: `Updated tool ${ updatedTool?.name } (${ updatedTool?.toolId })`,
                         comments: req.body.comment || '',
@@ -349,12 +344,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     return res.status(404).json({ message: 'Tool not found' });
                 }
 
-                await storage.deleteTool(id);
-
-                await storage.createActivity({
+                await storage.deleteTool(id); await storage.createActivity({
                     user_id: Number(user.id),
                     action: 'delete',
-                    tool_id: id,
+                    toolId: id,
                     timestamp: new Date(),
                     details: `Deleted tool ${ tool.name } (${ tool.toolId })`,
                 });
@@ -390,9 +383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 next(error);
             }
         },
-    );
-
-    app.post(
+    ); app.post(
         '/api/reports',
         async (req: Request, res: Response, next: NextFunction) => {
             try {
@@ -435,25 +426,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const user = await getUserFromSession(req);
                 if (!user) return res.sendStatus(401);
 
+                // Import PDF generator
+                const { generateReportPDF } = await import('./utils/pdf-generator');
+
+                // Get filtered tools for the report
+                const tools = await storage.getToolsForReport({
+                    tags: req.body.tags,
+                    startDate: req.body.startDate,
+                    endDate: req.body.endDate,
+                });
+
+                // Generate PDF
+                const pdfBuffer = await generateReportPDF({
+                    tools,
+                    reportType: req.body.reportType,
+                    tags: req.body.tags,
+                    startDate: req.body.startDate,
+                    endDate: req.body.endDate,
+                    generatedBy: user.full_name || user.username,
+                    generatedAt: new Date(),
+                });
+
+                // Log the activity
                 await storage.createActivity({
                     user_id: Number(user.id),
                     action: 'report',
                     timestamp: new Date(),
-                    details: `Generated ${ req.body.reportType } report for ${ req.body.tags.join(', ') } tagged tools`,
+                    details: `Generated ${ req.body.reportType } report for ${ req.body.tags.join(', ') || 'all' } tagged tools`,
                 });
 
-                res.json({
-                    success: true,
-                    message: 'Report generated successfully',
-                    reportType: req.body.reportType,
-                    tags: req.body.tags,
-                    dateRange: {
-                        startDate: req.body.startDate,
-                        endDate: req.body.endDate,
-                    },
-                    format: req.body.format || 'pdf',
-                });
+                // Set response headers for PDF download
+                const fileName = `wireline-report-${ req.body.reportType }-${ new Date().toISOString().split('T')[0] }.pdf`;
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', `attachment; filename="${ fileName }"`);
+                res.setHeader('Content-Length', pdfBuffer.length);
+
+                // Send the PDF
+                res.send(pdfBuffer);
             } catch (error) {
+                console.error('Report generation error:', error);
                 next(error);
             }
         },
@@ -498,10 +509,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 full_name: validatedData.full_name,
                 email: validatedData.email,
                 role: validatedData.role,
-            };
-
-            const user = await storage.createUser(userData);
-            req.session.userId = user.id;
+            }; const user = await storage.createUser(userData);
+            req.session.userId = Number(user.id);
             res.status(201).json(user);
         } catch (error) {
             next(error);

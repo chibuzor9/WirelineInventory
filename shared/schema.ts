@@ -49,10 +49,10 @@ export const insertToolSchema = createInsertSchema(tools).omit({
 // Activity model
 export const activities = pgTable("activities", {
     id: serial("id").primaryKey(),
-    user_id: bigint("user_id", { mode: "bigint" }).notNull(),
-    action: text("action").notNull(),
-    tool_id: integer("tool_id"),
-    timestamp: timestamp("timestamp").notNull(),
+    user_id: integer("user_id").notNull(),
+    action: varchar("action", { length: 255 }).notNull(),
+    toolId: integer("toolId"),
+    timestamp: timestamp("timestamp").defaultNow(),
     details: text("details"),
     comments: text("comments"),
     previous_status: text("previous_status"),
@@ -63,7 +63,7 @@ export const activities = pgTable("activities", {
             foreignColumns: [users.id],
         }),
         toolIdFk: foreignKey({
-            columns: [table.tool_id],
+            columns: [table.toolId],
             foreignColumns: [tools.id],
         }),
     };
@@ -93,9 +93,8 @@ export const activitiesRelations = relations(activities, ({ one }: any) => ({
         fields: [activities.user_id],
         references: [users.id],
         relationName: "user_activities",
-    }),
-    tool: one(tools, {
-        fields: [activities.tool_id],
+    }), tool: one(tools, {
+        fields: [activities.toolId],
         references: [tools.id],
         relationName: "tool_activities",
     }),
