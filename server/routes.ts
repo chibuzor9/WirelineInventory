@@ -223,9 +223,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const tool = await storage.createTool(toolData);
 
                 await storage.createActivity({
-                    userId: Number(user.id),
+                    user_id: Number(user.id),
                     action: 'create',
-                    toolId: tool.id,
+                    tool_id: tool.id,
                     timestamp: new Date(),
                     details: `Created tool ${ tool.name } (${ tool.toolId }) with ${ tool.status } tag`,
                 });
@@ -290,23 +290,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     req.body.status !== existingTool.status
                 ) {
                     await storage.createActivity({
-                        userId: Number(user.id),
+                        user_id: Number(user.id),
                         action: 'update',
-                        toolId: id,
+                        tool_id: id,
                         timestamp: new Date(),
                         details: `Changed tag for ${ updatedTool?.name } (${ updatedTool?.toolId }) from ${ existingTool.status } to ${ req.body.status }`,
                         comments: req.body.comment || '',
-                        previousStatus: existingTool.status,
+                        previous_status: existingTool.status,
                     });
                 } else {
                     await storage.createActivity({
-                        userId: Number(user.id),
+                        user_id: Number(user.id),
                         action: 'update',
-                        toolId: id,
+                        tool_id: id,
                         timestamp: new Date(),
                         details: `Updated tool ${ updatedTool?.name } (${ updatedTool?.toolId })`,
                         comments: req.body.comment || '',
-                        previousStatus: undefined,
+                        previous_status: undefined,
                     });
                 }
 
@@ -352,9 +352,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 await storage.deleteTool(id);
 
                 await storage.createActivity({
-                    userId: Number(user.id),
+                    user_id: Number(user.id),
                     action: 'delete',
-                    toolId: id,
+                    tool_id: id,
                     timestamp: new Date(),
                     details: `Deleted tool ${ tool.name } (${ tool.toolId })`,
                 });
@@ -436,7 +436,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 if (!user) return res.sendStatus(401);
 
                 await storage.createActivity({
-                    userId: Number(user.id),
+                    user_id: Number(user.id),
                     action: 'report',
                     timestamp: new Date(),
                     details: `Generated ${ req.body.reportType } report for ${ req.body.tags.join(', ') } tagged tools`,

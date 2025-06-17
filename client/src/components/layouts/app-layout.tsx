@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useLocation } from 'wouter';
 import Sidebar from '@/components/sidebar';
 import SearchInput from '@/components/ui/search-input';
+import AboutModal from '@/components/about-modal';
+import NotificationModal from '@/components/notification-modal';
 import { Menu, BellRing, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
@@ -12,19 +14,26 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+    const [isNotificationModalOpen, setIsNotificationModalOpen] =
+        useState(false);
     const [searchValue, setSearchValue] = useState('');
     const [location, setLocation] = useLocation();
 
     const handleSearch = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && searchValue.trim()) {
             // Navigate to inventory page with search parameter
-            setLocation(`/inventory?search=${encodeURIComponent(searchValue.trim())}`);
+            setLocation(
+                `/inventory?search=${encodeURIComponent(searchValue.trim())}`,
+            );
         }
     };
 
     const handleSearchSubmit = () => {
         if (searchValue.trim()) {
-            setLocation(`/inventory?search=${encodeURIComponent(searchValue.trim())}`);
+            setLocation(
+                `/inventory?search=${encodeURIComponent(searchValue.trim())}`,
+            );
         }
     };
 
@@ -89,6 +98,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                 variant="ghost"
                                 size="icon"
                                 className="relative"
+                                onClick={() => setIsNotificationModalOpen(true)}
+                                title="Notifications"
                             >
                                 <BellRing className="h-5 w-5 text-neutral-800" />
                                 <span className="absolute top-1 right-1 w-2 h-2 bg-halliburton-red rounded-full"></span>
@@ -97,6 +108,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                 variant="ghost"
                                 size="icon"
                                 className="hidden md:flex"
+                                onClick={() => setIsAboutModalOpen(true)}
+                                title="About this system"
                             >
                                 <HelpCircle className="h-5 w-5 text-neutral-800" />
                             </Button>
@@ -121,6 +134,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     {children}
                 </main>
             </div>
+
+            {/* About Modal */}
+            <AboutModal
+                open={isAboutModalOpen}
+                onOpenChange={setIsAboutModalOpen}
+            />
+
+            {/* Notification Modal */}
+            <NotificationModal
+                open={isNotificationModalOpen}
+                onOpenChange={setIsNotificationModalOpen}
+            />
         </div>
     );
 }

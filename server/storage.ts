@@ -34,7 +34,12 @@ export interface IStorage {
     deleteTool(id: number): Promise<boolean>;
     createActivity(activity: InsertActivity): Promise<Activity>;
     getActivities(limit?: number): Promise<Activity[]>;
-    getToolStats(): Promise<{ red: number; yellow: number; green: number; white: number }>;
+    getToolStats(): Promise<{
+        red: number;
+        yellow: number;
+        green: number;
+        white: number;
+    }>;
     sessionStore: session.Store;
 }
 
@@ -78,7 +83,7 @@ export class SupabaseStorage implements IStorage {
             password: hashedPassword,
             full_name: user.full_name,
             email: user.email,
-            role: 'user'
+            role: 'user',
         };
 
         const { data, error } = await supabase
@@ -87,7 +92,9 @@ export class SupabaseStorage implements IStorage {
             .select()
             .single();
         if (error || !data) {
-            throw new Error('Error creating user: ' + (error?.message || 'Unknown error'));
+            throw new Error(
+                'Error creating user: ' + (error?.message || 'Unknown error'),
+            );
         }
 
         return data as User;
@@ -100,7 +107,10 @@ export class SupabaseStorage implements IStorage {
     }
 
     // Method to compare passwords (works with both hashed and plain text)
-    async comparePassword(inputPassword: string, storedPassword: string): Promise<boolean> {
+    async comparePassword(
+        inputPassword: string,
+        storedPassword: string,
+    ): Promise<boolean> {
         // If stored password is hashed, use bcrypt compare
         if (this.isPasswordHashed(storedPassword)) {
             return await bcrypt.compare(inputPassword, storedPassword);
@@ -144,9 +154,13 @@ export class SupabaseStorage implements IStorage {
         let query = supabase.from('tools').select('*', { count: 'exact' });
         if (options?.status) query = query.eq('status', options.status);
         if (options?.category) query = query.eq('category', options.category);
-        if (options?.search) query = query.ilike('name', `%${ options.search }%`);
+        if (options?.search) query = query.ilike('name', `%${options.search}%`);
         if (options?.limit) query = query.limit(options.limit);
-        if (options?.offset) query = query.range(options.offset, (options.offset || 0) + (options.limit || 10) - 1);
+        if (options?.offset)
+            query = query.range(
+                options.offset,
+                (options.offset || 0) + (options.limit || 10) - 1,
+            );
         const { data, error, count } = await query;
         if (error) {
             console.error('Error fetching tools:', error);
@@ -162,12 +176,17 @@ export class SupabaseStorage implements IStorage {
             .select()
             .single();
         if (error || !data) {
-            throw new Error('Error creating tool: ' + (error?.message || 'Unknown error'));
+            throw new Error(
+                'Error creating tool: ' + (error?.message || 'Unknown error'),
+            );
         }
         return data as Tool;
     }
 
-    async updateTool(id: number, tool: Partial<Tool>): Promise<Tool | undefined> {
+    async updateTool(
+        id: number,
+        tool: Partial<Tool>,
+    ): Promise<Tool | undefined> {
         const { data, error } = await supabase
             .from('tools')
             .update(tool)
@@ -182,10 +201,7 @@ export class SupabaseStorage implements IStorage {
     }
 
     async deleteTool(id: number): Promise<boolean> {
-        const { error } = await supabase
-            .from('tools')
-            .delete()
-            .eq('id', id);
+        const { error } = await supabase.from('tools').delete().eq('id', id);
         if (error) {
             console.error('Error deleting tool:', error);
             return false;
@@ -200,8 +216,12 @@ export class SupabaseStorage implements IStorage {
             .insert([activity])
             .select()
             .single();
+            
         if (error || !data) {
-            throw new Error('Error creating activity: ' + (error?.message || 'Unknown error'));
+            throw new Error(
+                'Error creating activity: ' +
+                    (error?.message || 'Unknown error'),
+            );
         }
         return data as Activity;
     }
@@ -224,27 +244,35 @@ export class SupabaseStorage implements IStorage {
         }
 
         // Get unique user IDs and tool IDs
-        const userIds = Array.from(new Set(activitiesData.map(a => a.user_id).filter(Boolean)));
-        const toolIds = Array.from(new Set(activitiesData.map(a => a.tool_id).filter(Boolean)));
+        const userIds = Array.from(
+            new Set(activitiesData.map((a) => a.user_id).filter(Boolean)),
+        );
+        const toolIds = Array.from(
+            new Set(activitiesData.map((a) => a.tool_id).filter(Boolean)),
+        );
 
         // Fetch users and tools separately
         const [usersResult, toolsResult] = await Promise.all([
-            userIds.length > 0 ? supabase
-                .from('users')
-                .select('id, username, full_name')
-                .in('id', userIds) : { data: [], error: null },
-            toolIds.length > 0 ? supabase
-                .from('tools')
-                .select('id, tool_id, name, status')
-                .in('id', toolIds) : { data: [], error: null }
+            userIds.length > 0
+                ? supabase
+                      .from('users')
+                      .select('id, username, full_name')
+                      .in('id', userIds)
+                : { data: [], error: null },
+            toolIds.length > 0
+                ? supabase
+                      .from('tools')
+                      .select('id, tool_id, name, status')
+                      .in('id', toolIds)
+                : { data: [], error: null },
         ]);
 
         // Create lookup maps
-        const usersMap = new Map(usersResult.data?.map(u => [u.id, u]) || []);
-        const toolsMap = new Map(toolsResult.data?.map(t => [t.id, t]) || []);
+        const usersMap = new Map(usersResult.data?.map((u) => [u.id, u]) || []);
+        const toolsMap = new Map(toolsResult.data?.map((t) => [t.id, t]) || []);
 
         // Combine the data
-        const enrichedActivities = activitiesData.map(activity => ({
+        const enrichedActivities = activitiesData.map((activity) => ({
             ...activity,
             user: activity.user_id ? usersMap.get(activity.user_id) : null,
             tool: activity.tool_id ? toolsMap.get(activity.tool_id) : null,
@@ -253,10 +281,13 @@ export class SupabaseStorage implements IStorage {
         return enrichedActivities as Activity[];
     }
 
-    async getToolStats(): Promise<{ red: number; yellow: number; green: number; white: number }> {
-        const { data, error } = await supabase
-            .from('tools')
-            .select('status');
+    async getToolStats(): Promise<{
+        red: number;
+        yellow: number;
+        green: number;
+        white: number;
+    }> {
+        const { data, error } = await supabase.from('tools').select('status');
         if (error || !data) {
             console.error('Error fetching tool stats:', error);
             return { red: 0, yellow: 0, green: 0, white: 0 };

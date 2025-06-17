@@ -1,24 +1,23 @@
-import { pgTable, text, serial, integer, timestamp, primaryKey, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, primaryKey, foreignKey, bigint, varchar, smallint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
 // User model
 export const users = pgTable("users", {
-    id: serial("id").primaryKey(),
-    username: text("username").notNull().unique(),
+    id: bigint("id", { mode: "bigint" }).primaryKey(),
+    username: varchar("username").notNull().unique(),
     password: text("password").notNull(),
     full_name: text("full_name").notNull(),
-    email: text("email").notNull(),
-    role: text("role").default("User").notNull(),
+    email: varchar("email").notNull(),
+    role: varchar("role").default("user").notNull(),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    status: smallint("status").default(1),
 });
 
-export const insertUserSchema = createInsertSchema(users, {
-    username: z.string().min(1, "Username is required"),
-    password: z.string().min(1, "Password is required"),
-    full_name: z.string().min(1, "Full name is required"),
-    email: z.string().email("Invalid email address"),
-    role: z.string().default("user"),
+export const insertUserSchema = createInsertSchema(users).omit({
+    id: true,
+    created_at: true,
 });
 
 // Tool model
@@ -31,7 +30,7 @@ export const tools = pgTable("tools", {
     status: text("status").notNull(), // 'red', 'yellow', 'green'
     location: text("location"),
     lastUpdated: timestamp("last_updated").notNull(),
-    lastUpdatedBy: integer("last_updated_by").notNull(),
+    lastUpdatedBy: bigint("last_updated_by", { mode: "bigint" }).notNull(),
 }, (table: any) => {
     return {
         lastUpdatedByFk: foreignKey({
@@ -41,14 +40,7 @@ export const tools = pgTable("tools", {
     };
 });
 
-export const insertToolSchema = createInsertSchema(tools, {
-    toolId: z.string().min(1, "Tool ID is required"),
-    name: z.string().min(1, "Name is required"),
-    category: z.string().min(1, "Category is required"),
-    description: z.string().optional(),
-    status: z.string().min(1, "Status is required"),
-    location: z.string().optional(),
-}).omit({
+export const insertToolSchema = createInsertSchema(tools).omit({
     id: true,
     lastUpdatedBy: true,
     lastUpdated: true,
@@ -57,35 +49,27 @@ export const insertToolSchema = createInsertSchema(tools, {
 // Activity model
 export const activities = pgTable("activities", {
     id: serial("id").primaryKey(),
-    userId: integer("user_id").notNull(),
+    user_id: bigint("user_id", { mode: "bigint" }).notNull(),
     action: text("action").notNull(),
-    toolId: integer("tool_id"),
+    tool_id: integer("tool_id"),
     timestamp: timestamp("timestamp").notNull(),
     details: text("details"),
     comments: text("comments"),
-    previousStatus: text("previous_status"),
+    previous_status: text("previous_status"),
 }, (table: any) => {
     return {
         userIdFk: foreignKey({
-            columns: [table.userId],
+            columns: [table.user_id],
             foreignColumns: [users.id],
         }),
         toolIdFk: foreignKey({
-            columns: [table.toolId],
+            columns: [table.tool_id],
             foreignColumns: [tools.id],
         }),
     };
 });
 
-export const insertActivitySchema = createInsertSchema(activities, {
-    userId: z.number().int().positive(),
-    action: z.string().min(1, "Action is required"),
-    toolId: z.number().int().positive().optional(),
-    timestamp: z.date(),
-    details: z.string().optional(),
-    comments: z.string().optional(),
-    previousStatus: z.string().optional(),
-}).omit({
+export const insertActivitySchema = createInsertSchema(activities).omit({
     id: true,
 });
 
@@ -106,12 +90,12 @@ export const toolsRelations = relations(tools, ({ one, many }: any) => ({
 
 export const activitiesRelations = relations(activities, ({ one }: any) => ({
     user: one(users, {
-        fields: [activities.userId],
+        fields: [activities.user_id],
         references: [users.id],
         relationName: "user_activities",
     }),
     tool: one(tools, {
-        fields: [activities.toolId],
+        fields: [activities.tool_id],
         references: [tools.id],
         relationName: "tool_activities",
     }),
@@ -138,13 +122,13 @@ export type InsertTool = {
 export type Tool = typeof tools.$inferSelect;
 
 export type InsertActivity = {
-    userId: number;
+    user_id: number;
     action: string;
-    toolId?: number;
+    tool_id?: number;
     timestamp: Date;
     details?: string;
     comments?: string;
-    previousStatus?: string;
+    previous_status?: string;
 };
 export type Activity = typeof activities.$inferSelect;
 
