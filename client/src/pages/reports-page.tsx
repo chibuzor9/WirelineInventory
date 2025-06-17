@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useRealtimeTools } from '@/hooks/use-realtime-tools';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 import {
     Card,
     CardContent,
@@ -68,10 +70,73 @@ interface ReportMetrics {
 export default function ReportsPage() {
     // Enable real-time updates for tools
     useRealtimeTools();
+    const { toast } = useToast();
 
     const [timeframe, setTimeframe] = useState('30days');
     const [reportType, setReportType] = useState('status');
     const [activeTab, setActiveTab] = useState('overview');
+
+    // Quick report generation mutation
+    const quickReportMutation = useMutation({
+        mutationFn: async ({
+            format,
+            type,
+        }: {
+            format: string;
+            type: string;
+        }) => {
+            const response = await apiRequest('POST', '/api/reports', {
+                reportType: 'tag-status',
+                tags: ['red', 'yellow', 'green', 'white'],
+                format,
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+
+                const extension =
+                    format === 'excel'
+                        ? 'xlsx'
+                        : format === 'csv'
+                          ? 'csv'
+                          : 'pdf';
+                link.download = `quick-report-${new Date().toISOString().split('T')[0]}.${extension}`;
+
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+                return { success: true };
+            } else {
+                throw new Error('Failed to generate report');
+            }
+        },
+        onSuccess: (_, variables) => {
+            toast({
+                title: 'Report generated',
+                description: `Your ${variables.format.toUpperCase()} report has been downloaded successfully.`,
+            });
+            queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
+        },
+        onError: (error) => {
+            toast({
+                title: 'Error',
+                description: `Failed to generate report: ${error.message}`,
+                variant: 'destructive',
+            });
+        },
+    });
+
+    const handlePrintReport = () => {
+        window.print();
+    };
+
+    const handleQuickExport = (format: string) => {
+        quickReportMutation.mutate({ format, type: 'quick' });
+    };
 
     // Fetch tools statistics
     const { data: statsData, isLoading: isStatsLoading } = useQuery({
@@ -175,15 +240,19 @@ export default function ReportsPage() {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={handlePrintReport}>
                                 <Printer className="h-4 w-4 mr-2" />
                                 Print Report
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => handleQuickExport('pdf')}
+                            >
                                 <FileDown className="h-4 w-4 mr-2" />
                                 Export PDF
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() => handleQuickExport('csv')}
+                            >
                                 <FileDown className="h-4 w-4 mr-2" />
                                 Export CSV
                             </DropdownMenuItem>
@@ -547,7 +616,9 @@ export default function ReportsPage() {
                                                                 '—'}
                                                         </TableCell>
                                                         <TableCell>
-                                                            {tool.lastUpdated}
+                                                            {new Date(
+                                                                tool.lastUpdated,
+                                                            ).toLocaleDateString()}
                                                         </TableCell>
                                                     </TableRow>
                                                 ),
@@ -697,7 +768,12 @@ export default function ReportsPage() {
                                 <Calendar className="mr-2 h-4 w-4" />
                                 Data range: Jan 01, 2025 - Jun 30, 2025
                             </div>
-                            <Button variant="outline" className="ml-auto">
+                            <Button
+                                variant="outline"
+                                className="ml-auto"
+                                onClick={() => handleQuickExport('excel')}
+                                disabled={quickReportMutation.isPending}
+                            >
                                 <FileDown className="h-4 w-4 mr-2" />
                                 Export Data
                             </Button>

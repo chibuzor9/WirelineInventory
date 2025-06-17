@@ -421,13 +421,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     return res
                         .status(400)
                         .json({ message: 'Invalid date range' });
-                }
-
-                const user = await getUserFromSession(req);
+                } const user = await getUserFromSession(req);
                 if (!user) return res.sendStatus(401);
-
-                // Import PDF generator
-                const { generateReportPDF } = await import('./utils/pdf-generator');
 
                 // Get filtered tools for the report
                 const tools = await storage.getToolsForReport({
@@ -436,8 +431,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     endDate: req.body.endDate,
                 });
 
-                // Generate PDF
-                const pdfBuffer = await generateReportPDF({
+                const reportData = {
                     tools,
                     reportType: req.body.reportType,
                     tags: req.body.tags,
@@ -445,24 +439,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     endDate: req.body.endDate,
                     generatedBy: user.full_name || user.username,
                     generatedAt: new Date(),
-                });
+                };
+
+                const format = req.body.format || 'pdf';
+                let buffer: Buffer;
+                let contentType: string;
+                let fileName: string;
+
+                switch (format) {
+                    case 'csv': {
+                        const { generateCSV } = await import('./utils/export-generator');
+                        const csvContent = generateCSV(reportData);
+                        buffer = Buffer.from(csvContent, 'utf-8');
+                        contentType = 'text/csv';
+                        fileName = `wireline-report-${ req.body.reportType }-${ new Date().toISOString().split('T')[0] }.csv`;
+                        break;
+                    }
+                    case 'excel': {
+                        const { generateExcel } = await import('./utils/export-generator');
+                        buffer = generateExcel(reportData);
+                        contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                        fileName = `wireline-report-${ req.body.reportType }-${ new Date().toISOString().split('T')[0] }.xlsx`;
+                        break;
+                    }
+                    default: {
+                        const { generateReportPDF } = await import('./utils/pdf-generator');
+                        buffer = await generateReportPDF(reportData);
+                        contentType = 'application/pdf';
+                        fileName = `wireline-report-${ req.body.reportType }-${ new Date().toISOString().split('T')[0] }.pdf`;
+                        break;
+                    }
+                }
 
                 // Log the activity
                 await storage.createActivity({
                     user_id: Number(user.id),
                     action: 'report',
                     timestamp: new Date(),
-                    details: `Generated ${ req.body.reportType } report for ${ req.body.tags.join(', ') || 'all' } tagged tools`,
+                    details: `Generated ${ req.body.reportType } report (${ format.toUpperCase() }) for ${ req.body.tags.join(', ') || 'all' } tagged tools`,
                 });
 
-                // Set response headers for PDF download
-                const fileName = `wireline-report-${ req.body.reportType }-${ new Date().toISOString().split('T')[0] }.pdf`;
-                res.setHeader('Content-Type', 'application/pdf');
+                // Set response headers for download
+                res.setHeader('Content-Type', contentType);
                 res.setHeader('Content-Disposition', `attachment; filename="${ fileName }"`);
-                res.setHeader('Content-Length', pdfBuffer.length);
+                res.setHeader('Content-Length', buffer.length);
 
-                // Send the PDF
-                res.send(pdfBuffer);
+                // Send the file
+                res.send(buffer);
             } catch (error) {
                 console.error('Report generation error:', error);
                 next(error);

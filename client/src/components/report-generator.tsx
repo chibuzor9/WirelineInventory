@@ -26,7 +26,6 @@ export default function ReportGenerator() {
     const [startDate, setStartDate] = useState<string>('');
     const [endDate, setEndDate] = useState<string>('');
     const [format, setFormat] = useState<string>('pdf');
-
     const reportMutation = useMutation({
         mutationFn: async () => {
             const response = await apiRequest('POST', '/api/reports', {
@@ -37,13 +36,22 @@ export default function ReportGenerator() {
                 format,
             });
 
-            // Handle PDF download
+            // Handle file download
             if (response.ok) {
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `wireline-report-${reportType}-${new Date().toISOString().split('T')[0]}.pdf`;
+
+                // Set filename based on format
+                const extension =
+                    format === 'excel'
+                        ? 'xlsx'
+                        : format === 'csv'
+                          ? 'csv'
+                          : 'pdf';
+                link.download = `wireline-report-${reportType}-${new Date().toISOString().split('T')[0]}.${extension}`;
+
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -56,7 +64,7 @@ export default function ReportGenerator() {
         onSuccess: () => {
             toast({
                 title: 'Report generated',
-                description: 'Your report has been downloaded successfully.',
+                description: `Your ${format.toUpperCase()} report has been downloaded successfully.`,
             });
             queryClient.invalidateQueries({ queryKey: ['/api/activities'] });
         },
