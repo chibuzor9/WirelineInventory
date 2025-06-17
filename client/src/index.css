@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    * {
+        @apply border-border;
+
+        body {
+            @apply font-sans antialiased bg-background text-foreground;
+        }
+    }
+
+    @layer components {
+        .tag-badge {
+            @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium;
+        }
+
+        .tag-badge-red {
+            @apply tag-badge bg-tag-red/10 text-tag-red border border-tag-red/20;
+        }
+
+        .tag-badge-yellow {
+            @apply tag-badge bg-tag-yellow/10 text-tag-yellow border border-tag-yellow/20;
+        }
+
+        .tag-badge-green {
+            @apply tag-badge bg-tag-green/10 text-tag-green border border-tag-green/20;
+        }
+
+        .tag-badge-white {
+            @apply tag-badge bg-tag-white/50 text-gray-700 border border-gray-300;
+        }
+
+        .halliburton-gradient {
+            @apply bg-gradient-to-r from-halliburton-red to-halliburton-blue;
+        }
+
+        .card-hover {
+            @apply transition-all duration-200 hover:shadow-md;
+        }
+
+        .stats-card {
+            @apply rounded-lg bg-white p-4 shadow-sm card-hover border-l-4;
+        }
+
+        .stats-card-red {
+            @apply stats-card border-tag-red;
+        }
+
+        .stats-card-yellow {
+            @apply stats-card border-tag-yellow;
+        }
+
+        .stats-card-green {
+            @apply stats-card border-tag-green;
+        }
+
+        .stats-card-white {
+            @apply stats-card border-gray-400;
+        }
+
+        .btn-halliburton {
+            @apply bg-halliburton-red hover:bg-halliburton-red/90 text-white;
+        }
+
+        /* Clean search input styling */
+        .search-clean {
+            @apply bg-white border-gray-300 text-gray-900 placeholder:text-gray-500;
+            @apply focus:border-halliburton-blue focus:ring-halliburton-blue/20 focus:ring-2;
+            @apply focus:bg-white;
+        }
+    }
+}
