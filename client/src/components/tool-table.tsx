@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useRealtimeTools } from '@/hooks/use-realtime-tools';
+import { useAuth } from '@/hooks/use-auth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import {
     Tool,
@@ -52,6 +53,8 @@ export default function ToolTable() {
     useRealtimeTools();
 
     const { toast } = useToast();
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'admin';
     const [page, setPage] = useState(1);
     const [limit] = useState(5);
     const [statusFilter, setStatusFilter] = useState<string>('all_tags');
@@ -238,13 +241,15 @@ export default function ToolTable() {
                             </Select>
 
                             {/* Add Tool Button */}
-                            <Button
-                                className="bg-halliburton-red hover:bg-halliburton-red/90"
-                                onClick={() => setIsAddDialogOpen(true)}
-                            >
-                                <Plus className="h-4 w-4 mr-1" />
-                                Add Tool
-                            </Button>
+                            {isAdmin && (
+                                <Button
+                                    className="bg-halliburton-red hover:bg-halliburton-red/90"
+                                    onClick={() => setIsAddDialogOpen(true)}
+                                >
+                                    <Plus className="h-4 w-4 mr-1" />
+                                    Add Tool
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -334,26 +339,30 @@ export default function ToolTable() {
                                                 >
                                                     <Eye className="h-4 w-4" />
                                                 </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8 text-neutral-500 hover:text-halliburton-blue"
-                                                    onClick={() =>
-                                                        handleEditTool(tool)
-                                                    }
-                                                >
-                                                    <Edit className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8 text-neutral-500 hover:text-red-500"
-                                                    onClick={() =>
-                                                        handleDeleteTool(tool)
-                                                    }
-                                                >
-                                                    <Trash className="h-4 w-4" />
-                                                </Button>
+                                                {isAdmin && (
+                                                    <>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-neutral-500 hover:text-halliburton-blue"
+                                                            onClick={() =>
+                                                                handleEditTool(tool)
+                                                            }
+                                                        >
+                                                            <Edit className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-neutral-500 hover:text-red-500"
+                                                            onClick={() =>
+                                                                handleDeleteTool(tool)
+                                                            }
+                                                        >
+                                                            <Trash className="h-4 w-4" />
+                                                        </Button>
+                                                    </>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>

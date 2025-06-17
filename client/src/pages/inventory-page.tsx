@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRealtimeTools } from '@/hooks/use-realtime-tools';
+import { useAuth } from '@/hooks/use-auth';
 import { useLocation } from 'wouter';
 import SearchInput from '@/components/ui/search-input';
 import {
@@ -60,6 +61,9 @@ import {
 export default function InventoryPage() {
     // Enable real-time updates for tools
     useRealtimeTools();
+
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'admin';
 
     const [location] = useLocation();
 
@@ -161,13 +165,15 @@ export default function InventoryPage() {
                     </p>
                 </div>
                 <div className="flex items-center space-x-2">
-                    <Button
-                        className="btn-halliburton"
-                        onClick={() => setIsAddDialogOpen(true)}
-                    >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Tool
-                    </Button>
+                    {isAdmin && (
+                        <Button
+                            className="btn-halliburton"
+                            onClick={() => setIsAddDialogOpen(true)}
+                        >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Tool
+                        </Button>
+                    )}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline">
@@ -329,16 +335,20 @@ export default function InventoryPage() {
                                                             Edit
                                                         </span>
                                                     </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-destructive hover:text-destructive/90 hover:bg-destructive/10"
-                                                    >
-                                                        <Trash className="h-4 w-4" />
-                                                        <span className="sr-only">
-                                                            Delete
-                                                        </span>
-                                                    </Button>
+                                                    {isAdmin && (
+                                                        <>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-destructive hover:text-destructive/90 hover:bg-destructive/10"
+                                                            >
+                                                                <Trash className="h-4 w-4" />
+                                                                <span className="sr-only">
+                                                                    Delete
+                                                                </span>
+                                                            </Button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                         </TableRow>

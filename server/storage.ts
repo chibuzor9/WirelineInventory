@@ -207,29 +207,50 @@ export class SupabaseStorage implements IStorage {
     }
 
     async getActivities(limit: number = 10): Promise<Activity[]> {
-        const { data, error } = await supabase
+        // First, get activities without joins
+        const { data: activitiesData, error: activitiesError } = await supabase
             .from('activities')
-            .select(`
-                *,
-                users:user_id (
-                    id,
-                    username,
-                    full_name
-                ),
-                tools:tool_id (
-                    id,
-                    tool_id,
-                    name,
-                    status
-                )
-            `)
+            .select('*')
             .order('timestamp', { ascending: false })
             .limit(limit);
-        if (error) {
-            console.error('Error fetching activities:', error);
+
+        if (activitiesError) {
+            console.error('Error fetching activities:', activitiesError);
             return [];
         }
-        return (data as Activity[]) || [];
+
+        if (!activitiesData || activitiesData.length === 0) {
+            return [];
+        }
+
+        // Get unique user IDs and tool IDs
+        const userIds = Array.from(new Set(activitiesData.map(a => a.user_id).filter(Boolean)));
+        const toolIds = Array.from(new Set(activitiesData.map(a => a.tool_id).filter(Boolean)));
+
+        // Fetch users and tools separately
+        const [usersResult, toolsResult] = await Promise.all([
+            userIds.length > 0 ? supabase
+                .from('users')
+                .select('id, username, full_name')
+                .in('id', userIds) : { data: [], error: null },
+            toolIds.length > 0 ? supabase
+                .from('tools')
+                .select('id, tool_id, name, status')
+                .in('id', toolIds) : { data: [], error: null }
+        ]);
+
+        // Create lookup maps
+        const usersMap = new Map(usersResult.data?.map(u => [u.id, u]) || []);
+        const toolsMap = new Map(toolsResult.data?.map(t => [t.id, t]) || []);
+
+        // Combine the data
+        const enrichedActivities = activitiesData.map(activity => ({
+            ...activity,
+            user: activity.user_id ? usersMap.get(activity.user_id) : null,
+            tool: activity.tool_id ? toolsMap.get(activity.tool_id) : null,
+        }));
+
+        return enrichedActivities as Activity[];
     }
 
     async getToolStats(): Promise<{ red: number; yellow: number; green: number; white: number }> {

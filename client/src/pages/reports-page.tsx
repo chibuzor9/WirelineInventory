@@ -547,9 +547,7 @@ export default function ReportsPage() {
                                                                 '—'}
                                                         </TableCell>
                                                         <TableCell>
-                                                            {formatDate(
-                                                                tool.lastUpdated.toISOString(),
-                                                            )}
+                                                            {tool.lastUpdated}
                                                         </TableCell>
                                                     </TableRow>
                                                 ),

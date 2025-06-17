@@ -72,7 +72,7 @@ export default function ToolDialog({
     const isViewMode = mode === 'view';
     const isEditMode = mode === 'edit';
     const isAddMode = mode === 'add';
-    const isAdmin = user?.role === 'Admin';
+    const isAdmin = user?.role === 'admin';
     const [originalStatus, setOriginalStatus] = useState<string>('');
 
     const form = useForm<ToolFormValues>({

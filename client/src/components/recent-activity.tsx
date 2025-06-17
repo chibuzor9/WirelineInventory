@@ -197,7 +197,9 @@ export default function RecentActivity({
                                             {timeAgo(
                                                 new Date(activity.timestamp),
                                             )}{' '}
-                                            • {activity.user.full_name}
+                                            •{' '}
+                                            {activity.user?.full_name ||
+                                                'Unknown User'}
                                         </p>
                                     </div>
                                 </li>

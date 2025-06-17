@@ -189,6 +189,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             try {
                 if (!isAuthenticated(req)) return res.sendStatus(401);
 
+                const user = await getUserFromSession(req);
+                if (!user) return res.sendStatus(401);
+
+                // Check if user has admin role
+                if (user.role !== 'admin') {
+                    return res.status(403).json({
+                        message: 'Access denied. Admin role required to create tools.',
+                    });
+                }
+
                 const validation = insertToolSchema.safeParse(req.body);
                 if (!validation.success) {
                     return res.status(400).json({
@@ -203,9 +213,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                             "Invalid tag status. Must be 'red', 'yellow', or 'green'",
                     });
                 }
-
-                const user = await getUserFromSession(req);
-                if (!user) return res.sendStatus(401);
 
                 const toolData = {
                     ...req.body,
@@ -240,6 +247,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             try {
                 if (!isAuthenticated(req)) return res.sendStatus(401);
 
+                const user = await getUserFromSession(req);
+                if (!user) return res.sendStatus(401);
+
+                // Allow all authenticated users to edit tools
+                // Admin users can edit everything, regular users can edit status and comments
+
                 const id = Number(req.params.id);
                 if (isNaN(id)) {
                     return res
@@ -263,9 +276,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                         });
                     }
                 }
-
-                const user = await getUserFromSession(req);
-                if (!user) return res.sendStatus(401);
 
                 const toolUpdate = {
                     ...req.body,
@@ -317,6 +327,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             try {
                 if (!isAuthenticated(req)) return res.sendStatus(401);
 
+                const user = await getUserFromSession(req);
+                if (!user) return res.sendStatus(401);
+
+                // Check if user has admin role
+                if (user.role !== 'admin') {
+                    return res.status(403).json({
+                        message: 'Access denied. Admin role required to delete tools.',
+                    });
+                }
+
                 const id = Number(req.params.id);
                 if (isNaN(id)) {
                     return res
@@ -330,9 +350,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
 
                 await storage.deleteTool(id);
-
-                const user = await getUserFromSession(req);
-                if (!user) return res.sendStatus(401);
 
                 await storage.createActivity({
                     userId: Number(user.id),
@@ -360,12 +377,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     : 10;
                 const activities = await storage.getActivities(limit);
 
-                // Activities now come with related data from the join query
+                // Activities now come with related data from the enriched query
                 const enrichedActivities = activities.map((activity: any) => ({
                     ...activity,
                     timestamp: new Date(activity.timestamp).toISOString(),
-                    user: activity.users || null,
-                    tool: activity.tools || null,
+                    // user and tool are already included from storage
                 }));
 
                 res.json(enrichedActivities);

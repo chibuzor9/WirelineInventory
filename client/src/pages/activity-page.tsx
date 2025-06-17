@@ -1,8 +1,18 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import SearchInput from '@/components/ui/search-input';
 import {
     User,
     Wrench,
@@ -13,6 +23,9 @@ import {
     FileText,
     Clock,
     Activity,
+    Filter,
+    X,
+    ChevronDown,
 } from 'lucide-react';
 
 interface ActivityUser {
@@ -166,7 +179,13 @@ function formatActivityText(activity: EnrichedActivity): {
 }
 
 export default function ActivityPage() {
-    const [limit, setLimit] = React.useState(50);
+    const [limit, setLimit] = useState(100);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [actionFilter, setActionFilter] = useState<string>('all');
+    const [userFilter, setUserFilter] = useState<string>('all');
+    const [dateFrom, setDateFrom] = useState<string>('');
+    const [dateTo, setDateTo] = useState<string>('');
+    const [showFilters, setShowFilters] = useState(false);
 
     const {
         data: activities = [],
@@ -194,6 +213,79 @@ export default function ActivityPage() {
         staleTime: 30000, // 30 seconds
         gcTime: 5 * 60 * 1000, // 5 minutes
     });
+
+    // Get unique users and actions for filters
+    const uniqueUsers = useMemo(() => {
+        const users = activities
+            .filter((activity) => activity.user?.full_name)
+            .map((activity) => ({
+                id: activity.user.id,
+                name: activity.user.full_name,
+            }));
+        return Array.from(
+            new Map(users.map((user) => [user.id, user])).values(),
+        );
+    }, [activities]);
+
+    const uniqueActions = useMemo(() => {
+        return Array.from(
+            new Set(activities.map((activity) => activity.action)),
+        );
+    }, [activities]);
+
+    // Filter activities based on current filters
+    const filteredActivities = useMemo(() => {
+        return activities.filter((activity) => {
+            // Search filter
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase();
+                const matchesSearch =
+                    activity.details.toLowerCase().includes(query) ||
+                    activity.comments?.toLowerCase().includes(query) ||
+                    activity.user?.full_name.toLowerCase().includes(query) ||
+                    activity.tool?.name?.toLowerCase().includes(query);
+                if (!matchesSearch) return false;
+            }
+
+            // Action filter
+            if (actionFilter !== 'all' && activity.action !== actionFilter) {
+                return false;
+            }
+
+            // User filter
+            if (userFilter !== 'all' && activity.user?.id !== userFilter) {
+                return false;
+            } // Date range filter
+            const activityDate = new Date(activity.timestamp);
+            if (dateFrom && activityDate < new Date(dateFrom)) {
+                return false;
+            }
+            if (dateTo) {
+                const endOfDay = new Date(dateTo);
+                endOfDay.setHours(23, 59, 59, 999);
+                if (activityDate > endOfDay) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }, [activities, searchQuery, actionFilter, userFilter, dateFrom, dateTo]);
+
+    const clearFilters = () => {
+        setSearchQuery('');
+        setActionFilter('all');
+        setUserFilter('all');
+        setDateFrom('');
+        setDateTo('');
+    };
+
+    const hasActiveFilters =
+        searchQuery ||
+        actionFilter !== 'all' ||
+        userFilter !== 'all' ||
+        dateFrom ||
+        dateTo;
 
     if (error) {
         return (
@@ -233,30 +325,150 @@ export default function ActivityPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-neutral-800">
-                        Activity Log
-                    </h1>
-                    <p className="text-sm text-neutral-600">
-                        System activity and audit trail ({activities.length}{' '}
-                        entries)
-                    </p>
+            <div className="flex flex-col space-y-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-neutral-800">
+                            Activity Log
+                        </h1>
+                        <p className="text-sm text-neutral-600">
+                            System activity and audit trail (
+                            {filteredActivities.length} of {activities.length}{' '}
+                            entries)
+                        </p>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowFilters(!showFilters)}
+                        >
+                            <Filter className="h-4 w-4 mr-2" />
+                            Filters
+                            <ChevronDown
+                                className={`h-4 w-4 ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`}
+                            />
+                        </Button>
+                        {hasActiveFilters && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={clearFilters}
+                            >
+                                <X className="h-4 w-4 mr-2" />
+                                Clear
+                            </Button>
+                        )}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => refetch()}
+                            disabled={isLoading}
+                        >
+                            <RefreshCw
+                                className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`}
+                            />
+                            Refresh
+                        </Button>
+                    </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => refetch()}
-                        disabled={isLoading}
-                    >
-                        <RefreshCw
-                            className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`}
-                        />
-                        Refresh
-                    </Button>
-                </div>
+                {/* Filters Panel */}
+                {showFilters && (
+                    <Card className="p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {/* Search */}
+                            <div>
+                                <Label htmlFor="search">Search</Label>
+                                <SearchInput
+                                    id="search"
+                                    placeholder="Search activities..."
+                                    value={searchQuery}
+                                    onChange={setSearchQuery}
+                                    className="mt-1"
+                                />
+                            </div>
+                            {/* Action Filter */}
+                            <div>
+                                <Label htmlFor="action">Action Type</Label>
+                                <Select
+                                    value={actionFilter}
+                                    onValueChange={setActionFilter}
+                                >
+                                    <SelectTrigger className="mt-1">
+                                        <SelectValue placeholder="All actions" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All Actions
+                                        </SelectItem>
+                                        {uniqueActions.map((action) => (
+                                            <SelectItem
+                                                key={action}
+                                                value={action}
+                                            >
+                                                {action
+                                                    .charAt(0)
+                                                    .toUpperCase() +
+                                                    action.slice(1)}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            {/* User Filter */}
+                            <div>
+                                <Label htmlFor="user">User</Label>
+                                <Select
+                                    value={userFilter}
+                                    onValueChange={setUserFilter}
+                                >
+                                    <SelectTrigger className="mt-1">
+                                        <SelectValue placeholder="All users" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All Users
+                                        </SelectItem>
+                                        {uniqueUsers.map((user) => (
+                                            <SelectItem
+                                                key={user.id}
+                                                value={user.id}
+                                            >
+                                                {user.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>{' '}
+                            {/* Date Range */}
+                            <div>
+                                <Label>Date Range</Label>
+                                <div className="flex gap-2 mt-1">
+                                    <Input
+                                        type="date"
+                                        value={dateFrom}
+                                        onChange={(e) =>
+                                            setDateFrom(e.target.value)
+                                        }
+                                        placeholder="From date"
+                                        className="flex-1"
+                                    />
+                                    <Input
+                                        type="date"
+                                        value={dateTo}
+                                        onChange={(e) =>
+                                            setDateTo(e.target.value)
+                                        }
+                                        placeholder="To date"
+                                        className="flex-1"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                )}
             </div>
 
             {/* Activity List */}
@@ -284,27 +496,38 @@ export default function ActivityPage() {
                                 </div>
                             ))}
                         </div>
-                    ) : activities.length === 0 ? (
+                    ) : filteredActivities.length === 0 ? (
                         <div className="text-center py-12">
                             <Activity className="h-12 w-12 text-neutral-400 mx-auto mb-4" />
                             <h3 className="text-lg font-semibold text-neutral-800 mb-2">
                                 No Activities Found
                             </h3>
                             <p className="text-neutral-600">
-                                No recent activity to display. Activities will
-                                appear here as users interact with the system.
+                                {hasActiveFilters
+                                    ? 'No activities match your current filters. Try adjusting your search criteria.'
+                                    : 'No recent activity to display. Activities will appear here as users interact with the system.'}
                             </p>
+                            {hasActiveFilters && (
+                                <Button
+                                    variant="outline"
+                                    onClick={clearFilters}
+                                    className="mt-4"
+                                >
+                                    Clear Filters
+                                </Button>
+                            )}
                         </div>
                     ) : (
                         <div className="space-y-0">
-                            {activities.map((activity, index) => {
+                            {filteredActivities.map((activity, index) => {
                                 const formattedActivity =
                                     formatActivityText(activity);
                                 return (
                                     <div
                                         key={activity.id}
                                         className={`flex items-center gap-4 p-4 ${
-                                            index < activities.length - 1
+                                            index <
+                                            filteredActivities.length - 1
                                                 ? 'border-b border-neutral-100'
                                                 : ''
                                         } hover:bg-neutral-50 transition-colors`}
@@ -330,7 +553,10 @@ export default function ActivityPage() {
                                                         activity.timestamp,
                                                     ),
                                                 )}{' '}
-                                                • {activity.user.full_name} •{' '}
+                                                •{' '}
+                                                {activity.user?.full_name ||
+                                                    'Unknown User'}{' '}
+                                                •{' '}
                                                 {new Date(
                                                     activity.timestamp,
                                                 ).toLocaleString()}
@@ -340,20 +566,51 @@ export default function ActivityPage() {
                                 );
                             })}
                         </div>
-                    )}
-
-                    {/* Load More Button */}
-                    {activities.length >= limit && (
-                        <div className="text-center pt-4 border-t border-neutral-100 mt-4">
-                            <Button
-                                variant="outline"
-                                onClick={() => setLimit((prev) => prev + 50)}
-                                disabled={isLoading}
-                            >
-                                Load More Activities
-                            </Button>
+                    )}{' '}
+                    {/* Pagination and Load More Controls */}
+                    <div className="flex items-center justify-between pt-4 border-t border-neutral-100 mt-4">
+                        <div className="flex items-center space-x-4">
+                            <div className="text-sm text-neutral-600">
+                                Showing {filteredActivities.length} of{' '}
+                                {activities.length} activities
+                            </div>
+                            {activities.length >= limit && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                        setLimit((prev) => prev + 100)
+                                    }
+                                    disabled={isLoading}
+                                >
+                                    Load More
+                                </Button>
+                            )}
                         </div>
-                    )}
+
+                        <div className="flex items-center space-x-2">
+                            <Label htmlFor="limit" className="text-sm">
+                                Show:
+                            </Label>
+                            <Select
+                                value={limit.toString()}
+                                onValueChange={(value) =>
+                                    setLimit(parseInt(value))
+                                }
+                            >
+                                <SelectTrigger className="w-20">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="50">50</SelectItem>
+                                    <SelectItem value="100">100</SelectItem>
+                                    <SelectItem value="200">200</SelectItem>
+                                    <SelectItem value="500">500</SelectItem>
+                                    <SelectItem value="1000">1000</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
         </div>
