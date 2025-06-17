@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
     Dialog,
     DialogContent,
@@ -7,7 +8,17 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, Clock, CheckCircle, AlertTriangle, Info } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+    Bell,
+    Clock,
+    CheckCircle,
+    AlertTriangle,
+    Info,
+    XCircle,
+    Wrench,
+    Activity,
+} from 'lucide-react';
 
 interface NotificationModalProps {
     open: boolean;
@@ -15,57 +26,46 @@ interface NotificationModalProps {
 }
 
 interface Notification {
-    id: number;
-    type: 'info' | 'warning' | 'success';
+    id: string;
+    type: 'info' | 'warning' | 'success' | 'error';
     title: string;
     message: string;
     timestamp: string;
     read: boolean;
+    source: 'activity' | 'tool';
+    data?: any;
 }
 
 export default function NotificationModal({
     open,
     onOpenChange,
 }: NotificationModalProps) {
-    const [notifications] = useState<Notification[]>([
-        {
-            id: 1,
-            type: 'warning',
-            title: 'Tool Maintenance Due',
-            message: 'Wireline Tool WL-001 is due for maintenance inspection.',
-            timestamp: '2 hours ago',
-            read: false,
+    // Fetch real notifications from API
+    const {
+        data: notifications = [],
+        isLoading,
+        error,
+    } = useQuery({
+        queryKey: ['/api/notifications'],
+        queryFn: async () => {
+            const response = await fetch('/api/notifications');
+            if (!response.ok) {
+                throw new Error('Failed to fetch notifications');
+            }
+            return response.json();
         },
-        {
-            id: 2,
-            type: 'info',
-            title: 'System Update',
-            message: 'Inventory system has been updated with new features.',
-            timestamp: '1 day ago',
-            read: false,
-        },
-        {
-            id: 3,
-            type: 'success',
-            title: 'Tool Status Updated',
-            message: 'Tool WL-015 status changed from Yellow to Green.',
-            timestamp: '2 days ago',
-            read: true,
-        },
-        {
-            id: 4,
-            type: 'warning',
-            title: 'Low Inventory Alert',
-            message: 'Running low on Category A tools. Consider restocking.',
-            timestamp: '3 days ago',
-            read: true,
-        },
-    ]);
+        refetchInterval: 30000, // Refresh every 30 seconds
+        enabled: open, // Only fetch when modal is open
+    });
 
-    const unreadCount = notifications.filter((n) => !n.read).length;
+    const unreadCount = notifications.filter(
+        (n: Notification) => !n.read,
+    ).length;
 
     const getIcon = (type: string) => {
         switch (type) {
+            case 'error':
+                return <XCircle className="h-4 w-4 text-red-600" />;
             case 'warning':
                 return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
             case 'success':
@@ -78,6 +78,8 @@ export default function NotificationModal({
 
     const getBadgeColor = (type: string) => {
         switch (type) {
+            case 'error':
+                return 'bg-red-100 text-red-800 border-red-300';
             case 'warning':
                 return 'bg-yellow-100 text-yellow-800 border-yellow-300';
             case 'success':
@@ -86,6 +88,35 @@ export default function NotificationModal({
             default:
                 return 'bg-blue-100 text-blue-800 border-blue-300';
         }
+    };
+
+    const getSourceIcon = (source: string) => {
+        switch (source) {
+            case 'tool':
+                return <Wrench className="h-3 w-3" />;
+            case 'activity':
+            default:
+                return <Activity className="h-3 w-3" />;
+        }
+    };
+
+    const formatTime = (timestamp: string) => {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffInMinutes = Math.floor(
+            (now.getTime() - date.getTime()) / (1000 * 60),
+        );
+
+        if (diffInMinutes < 1) return 'Just now';
+        if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+
+        const diffInHours = Math.floor(diffInMinutes / 60);
+        if (diffInHours < 24) return `${diffInHours}h ago`;
+
+        const diffInDays = Math.floor(diffInHours / 24);
+        if (diffInDays < 7) return `${diffInDays}d ago`;
+
+        return date.toLocaleDateString();
     };
 
     return (
@@ -103,59 +134,85 @@ export default function NotificationModal({
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                    {notifications.length === 0 ? (
-                        <div className="text-center py-8 text-neutral-500">
-                            <Bell className="h-12 w-12 mx-auto mb-4 text-neutral-300" />
-                            <p>No notifications available</p>
+                <div className="max-h-96 overflow-y-auto space-y-3">
+                    {isLoading ? (
+                        // Loading skeleton
+                        Array.from({ length: 5 }).map((_, index) => (
+                            <div
+                                key={index}
+                                className="flex items-start gap-3 p-3 border rounded-lg"
+                            >
+                                <Skeleton className="h-4 w-4 rounded-full" />
+                                <div className="flex-1 space-y-2">
+                                    <Skeleton className="h-4 w-3/4" />
+                                    <Skeleton className="h-3 w-full" />
+                                    <Skeleton className="h-3 w-1/2" />
+                                </div>
+                            </div>
+                        ))
+                    ) : error ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                            <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p>Failed to load notifications</p>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="mt-2"
+                                onClick={() => window.location.reload()}
+                            >
+                                Retry
+                            </Button>
+                        </div>
+                    ) : notifications.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                            <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p>No notifications yet</p>
                         </div>
                     ) : (
-                        notifications.map((notification) => (
+                        notifications.map((notification: Notification) => (
                             <div
                                 key={notification.id}
-                                className={`p-4 rounded-lg border transition-colors ${
-                                    notification.read
-                                        ? 'bg-neutral-50 border-neutral-200'
-                                        : 'bg-white border-neutral-300 shadow-sm'
+                                className={`flex items-start gap-3 p-3 border rounded-lg transition-colors ${
+                                    !notification.read
+                                        ? 'bg-blue-50 border-blue-200'
+                                        : 'bg-background hover:bg-muted/50'
                                 }`}
                             >
-                                <div className="flex items-start gap-3">
-                                    <div className="mt-0.5">
-                                        {getIcon(notification.type)}
+                                <div className="flex-shrink-0 mt-0.5">
+                                    {getIcon(notification.type)}
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <h4 className="font-medium text-sm text-foreground">
+                                            {notification.title}
+                                        </h4>
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            {getSourceIcon(notification.source)}
+                                            <span>{notification.source}</span>
+                                        </div>
                                     </div>
 
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <h4
-                                                className={`font-medium text-sm ${
-                                                    notification.read
-                                                        ? 'text-neutral-600'
-                                                        : 'text-neutral-900'
-                                                }`}
-                                            >
-                                                {notification.title}
-                                            </h4>
+                                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                        {notification.message}
+                                    </p>
+
+                                    <div className="flex items-center justify-between mt-2">
+                                        <div className="flex items-center gap-2">
                                             <Badge
                                                 variant="outline"
                                                 className={`text-xs ${getBadgeColor(notification.type)}`}
                                             >
                                                 {notification.type}
                                             </Badge>
+                                            {!notification.read && (
+                                                <div className="h-2 w-2 bg-blue-600 rounded-full"></div>
+                                            )}
                                         </div>
 
-                                        <p
-                                            className={`text-sm mt-1 ${
-                                                notification.read
-                                                    ? 'text-neutral-500'
-                                                    : 'text-neutral-700'
-                                            }`}
-                                        >
-                                            {notification.message}
-                                        </p>
-
-                                        <div className="flex items-center gap-1 mt-2 text-xs text-neutral-400">
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                             <Clock className="h-3 w-3" />
-                                            {notification.timestamp}
+                                            {formatTime(notification.timestamp)}
                                         </div>
                                     </div>
                                 </div>
@@ -164,19 +221,21 @@ export default function NotificationModal({
                     )}
                 </div>
 
-                {notifications.length > 0 && (
-                    <div className="flex justify-between items-center pt-4 border-t">
-                        <Button variant="ghost" size="sm" className="text-xs">
-                            Mark all as read
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-xs">
-                            Clear all
-                        </Button>
-                    </div>
-                )}
-
-                <div className="flex justify-end pt-2">
-                    <Button onClick={() => onOpenChange(false)}>Close</Button>
+                <div className="flex justify-between items-center pt-4 border-t">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={notifications.length === 0}
+                    >
+                        Mark All Read
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onOpenChange(false)}
+                    >
+                        Close
+                    </Button>
                 </div>
             </DialogContent>
         </Dialog>

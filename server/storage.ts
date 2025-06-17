@@ -330,6 +330,20 @@ export class SupabaseStorage implements IStorage {
 
         return data as Tool[];
     }
+
+    async getToolsByStatus(statuses: string[]): Promise<Tool[]> {
+        const { data, error } = await supabase
+            .from('tools')
+            .select('*')
+            .in('status', statuses)
+            .order('lastUpdated', { ascending: false });
+
+        if (error) {
+            throw new Error('Error fetching tools by status: ' + error.message);
+        }
+
+        return data as Tool[];
+    }
 }
 
 export const storage = new SupabaseStorage();

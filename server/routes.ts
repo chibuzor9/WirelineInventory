@@ -36,6 +36,35 @@ function isAuthenticated(req: Request): boolean {
     return !!req.session?.userId;
 }
 
+// Helper functions for notifications
+function getNotificationType(action: string, details: string): string {
+    if (action === 'create') return 'success';
+    if (action === 'delete') return 'error';
+    if (action === 'update' && details.includes('Red')) return 'error';
+    if (action === 'update' && details.includes('Yellow')) return 'warning';
+    if (action === 'update' && details.includes('Green')) return 'success';
+    if (action === 'report') return 'info';
+    return 'info';
+}
+
+function getNotificationTitle(action: string, details: string): string {
+    switch (action) {
+        case 'create':
+            return 'New Tool Added';
+        case 'update':
+            if (details.includes('tag')) {
+                return 'Tool Status Changed';
+            }
+            return 'Tool Updated';
+        case 'delete':
+            return 'Tool Removed';
+        case 'report':
+            return 'Report Generated';
+        default:
+            return 'System Activity';
+    }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
     setupAuth(app);
 
@@ -539,6 +568,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
             next(error);
         }
     });
+
+    app.get(
+        '/api/notifications',
+        async (req: Request, res: Response, next: NextFunction) => {
+            try {
+                if (!isAuthenticated(req)) return res.sendStatus(401);
+
+                const user = await getUserFromSession(req);
+                if (!user) return res.sendStatus(401);
+
+                // Get recent activities and convert them to notifications
+                const activities = await storage.getActivities(20); // Get last 20 activities
+
+                // Get tools that need attention (red/yellow status)
+                const alertTools = await storage.getToolsByStatus(['red', 'yellow']);
+
+                // Create notifications from activities
+                const activityNotifications = activities.map((activity: any, index: number) => ({
+                    id: `activity-${ activity.id }`,
+                    type: getNotificationType(activity.action, activity.details),
+                    title: getNotificationTitle(activity.action, activity.details),
+                    message: activity.details || `${ activity.action } performed`,
+                    timestamp: activity.timestamp,
+                    read: false,
+                    source: 'activity',
+                    data: activity
+                }));
+
+                // Create notifications for tools needing attention
+                const toolNotifications = alertTools.slice(0, 5).map((tool: any) => ({
+                    id: `tool-${ tool.id }`,
+                    type: tool.status === 'red' ? 'error' : 'warning',
+                    title: `Tool Attention Required`,
+                    message: `${ tool.name } (${ tool.toolId }) has ${ tool.status } status and may need attention`,
+                    timestamp: tool.lastUpdated,
+                    read: false,
+                    source: 'tool',
+                    data: tool
+                }));
+
+                // Combine and sort notifications by timestamp
+                const allNotifications = [...activityNotifications, ...toolNotifications]
+                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                    .slice(0, 15); // Limit to 15 most recent
+
+                res.json(allNotifications);
+            } catch (error) {
+                console.error('Notifications API error:', error);
+                next(error);
+            }
+        },
+    );
 
     const httpServer = createServer(app);
     return httpServer;
