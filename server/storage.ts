@@ -60,44 +60,86 @@ export class SupabaseStorage implements IStorage {
             return undefined;
         }
         return data && data[0] ? (data[0] as User) : undefined;
-    }
+    } async getUserByUsername(username: string): Promise<User | undefined> {
+        console.log(`[STORAGE] Getting user by username: ${ username }`);
 
-    async getUserByUsername(username: string): Promise<User | undefined> {
-        const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('username', username);
-        if (error) {
-            console.error('Error fetching user by username:', error);
-            return undefined;
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('username', username);
+
+            if (error) {
+                console.error('[STORAGE] Error fetching user by username:', {
+                    error: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                    code: error.code
+                });
+                throw new Error(`Database error: ${ error.message }`);
+            }
+
+            console.log(`[STORAGE] User query result:`, {
+                found: !!data?.[0],
+                dataLength: data?.length
+            });
+
+            return data && data[0] ? (data[0] as User) : undefined;
+        } catch (err) {
+            console.error('[STORAGE] Exception in getUserByUsername:', err);
+            throw err;
         }
-        return data && data[0] ? (data[0] as User) : undefined;
-    }
+    } async createUser(user: InsertUser): Promise<User> {
+        console.log(`[STORAGE] Creating user: ${ user.username }`);
 
-    async createUser(user: InsertUser): Promise<User> {
-        // Hash password for regular users
-        const hashedPassword = await bcrypt.hash(user.password as string, 10);
+        try {
+            // Hash password for regular users
+            const hashedPassword = await bcrypt.hash(user.password as string, 10);
 
-        const dbUser = {
-            username: user.username,
-            password: hashedPassword,
-            full_name: user.full_name,
-            email: user.email,
-            role: 'user',
-        };
+            const dbUser = {
+                username: user.username,
+                password: hashedPassword,
+                full_name: user.full_name,
+                email: user.email,
+                role: 'user',
+            };
 
-        const { data, error } = await supabase
-            .from('users')
-            .insert([dbUser])
-            .select()
-            .single();
-        if (error || !data) {
-            throw new Error(
-                'Error creating user: ' + (error?.message || 'Unknown error'),
-            );
+            console.log(`[STORAGE] Inserting user data:`, {
+                ...dbUser,
+                password: '[REDACTED]'
+            });
+
+            const { data, error } = await supabase
+                .from('users')
+                .insert([dbUser])
+                .select()
+                .single();
+
+            if (error) {
+                console.error('[STORAGE] Error creating user:', {
+                    error: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                    code: error.code
+                });
+                throw new Error(`Database error: ${ error.message }`);
+            }
+
+            if (!data) {
+                console.error('[STORAGE] No data returned from user creation');
+                throw new Error('No data returned from user creation');
+            }
+
+            console.log(`[STORAGE] User created successfully:`, {
+                id: data.id,
+                username: data.username
+            });
+
+            return data as User;
+        } catch (err) {
+            console.error('[STORAGE] Exception in createUser:', err);
+            throw err;
         }
-
-        return data as User;
     }
 
     // Helper method to check if password is already hashed

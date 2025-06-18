@@ -569,14 +569,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 next(error);
             }
         },
-    );
-
-    app.post('/api/register', async (req: Request, res: Response, next: NextFunction) => {
+    ); app.post('/api/register', async (req: Request, res: Response, next: NextFunction) => {
         try {
+            console.log('[REGISTER] Starting registration process');
             const { username, password, full_name, email } = req.body;
 
             // Validate required fields
             if (!username || !password || !full_name || !email) {
+                console.log('[REGISTER] Missing required fields');
                 return res.status(400).json({ message: 'All fields are required' });
             }
 
@@ -588,13 +588,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
 
             // Check if user already exists
+            console.log('[REGISTER] Checking if user exists');
             const existing = await storage.getUserByUsername(username);
             if (existing) {
+                console.log('[REGISTER] User already exists');
                 return res
                     .status(409)
                     .json({ message: 'Username already exists' });
             }
 
+            console.log('[REGISTER] Validating user data');
             // Validate and create user data
             const validatedData = insertUserSchema.parse({
                 username,
@@ -610,11 +613,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 full_name: validatedData.full_name,
                 email: validatedData.email,
                 role: validatedData.role,
-            }; const user = await storage.createUser(userData);
+            };
+
+            console.log('[REGISTER] Creating user in database');
+            const user = await storage.createUser(userData);
+
+            console.log('[REGISTER] Setting session');
             req.session.userId = Number(user.id);
+
+            console.log('[REGISTER] Registration successful');
             res.status(201).json(user);
         } catch (error) {
-            next(error);
+            console.error('[REGISTER] Registration error:', error);
+            if (error instanceof Error) {
+                res.status(500).json({ message: error.message });
+            } else {
+                res.status(500).json({ message: 'Internal server error during registration' });
+            }
         }
     });
 
