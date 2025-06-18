@@ -24,6 +24,48 @@ declare module 'express-session' {
     }
 }
 
+// Health check endpoint for monitoring
+function addHealthCheck(app: Express) {
+    app.get('/health', async (req: Request, res: Response) => {
+        try {
+            // Basic health check
+            const healthCheck: Record<string, any> = {
+                status: 'ok',
+                timestamp: new Date().toISOString(),
+                environment: process.env.NODE_ENV || 'development',
+                version: process.env.npm_package_version || '1.0.0',
+                uptime: process.uptime(),
+            };
+
+            // Test database connection
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('count')
+                    .limit(1);
+                if (error) throw error;
+                healthCheck.database = 'connected';
+            } catch (error) {
+                healthCheck.database = 'disconnected';
+                healthCheck.status = 'degraded';
+            }
+
+            res
+                .status(healthCheck.status === 'ok' ? 200 : 503)
+                .json(healthCheck);
+        } catch (error) {
+            res.status(500).json({
+                status: 'error',
+                timestamp: new Date().toISOString(), error: error instanceof Error ? error.message : 'Unknown error',
+            });
+        }
+    });
+
+    app.get('/api/health', async (req: Request, res: Response) => {
+        res.redirect('/health');
+    });
+}
+
 // Remove supabaseSession logic and use userId in session
 async function getUserFromSession(req: Request) {
     const userId = req.session?.userId;
@@ -67,6 +109,7 @@ function getNotificationTitle(action: string, details: string): string {
 
 export async function registerRoutes(app: Express): Promise<Server> {
     setupAuth(app);
+    addHealthCheck(app);
 
     app.post(
         '/api/login',
@@ -244,12 +287,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     ...req.body,
                     lastUpdated: new Date(),
                     lastUpdatedBy: Number(user.id),
-                };
-
-                const tool = await storage.createTool(toolData); await storage.createActivity({
+                }; const tool = await storage.createTool(toolData); await storage.createActivity({
                     user_id: Number(user.id),
                     action: 'create',
-                    toolId: tool.id,
+                    tool_id: tool.id,
                     timestamp: new Date(),
                     details: `Created tool ${ tool.name } (${ tool.toolId }) with ${ tool.status } tag`,
                 });
@@ -316,7 +357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     await storage.createActivity({
                         user_id: Number(user.id),
                         action: 'update',
-                        toolId: id,
+                        tool_id: id,
                         timestamp: new Date(),
                         details: `Changed tag for ${ updatedTool?.name } (${ updatedTool?.toolId }) from ${ existingTool.status } to ${ req.body.status }`,
                         comments: req.body.comment || '',
@@ -326,7 +367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     await storage.createActivity({
                         user_id: Number(user.id),
                         action: 'update',
-                        toolId: id,
+                        tool_id: id,
                         timestamp: new Date(),
                         details: `Updated tool ${ updatedTool?.name } (${ updatedTool?.toolId })`,
                         comments: req.body.comment || '',
@@ -371,12 +412,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const tool = await storage.getTool(id);
                 if (!tool) {
                     return res.status(404).json({ message: 'Tool not found' });
-                }
-
-                await storage.deleteTool(id); await storage.createActivity({
+                } await storage.deleteTool(id); await storage.createActivity({
                     user_id: Number(user.id),
                     action: 'delete',
-                    toolId: id,
+                    tool_id: id,
                     timestamp: new Date(),
                     details: `Deleted tool ${ tool.name } (${ tool.toolId })`,
                 });

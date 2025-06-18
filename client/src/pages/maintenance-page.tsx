@@ -525,10 +525,11 @@ export default function MaintenancePage() {
                                                     {renderTagBadge(
                                                         tool.status as ToolTag,
                                                     )}
-                                                </TableCell>
+                                                </TableCell>{' '}
                                                 <TableCell>
                                                     {formatDate(
-                                                        tool.lastUpdated,
+                                                        tool.lastUpdated?.toISOString() ||
+                                                            null,
                                                     )}
                                                 </TableCell>
                                                 <TableCell>

@@ -378,11 +378,10 @@ export default function ActivityPage() {
                 {showFilters && (
                     <Card className="p-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {/* Search */}
+                            {/* Search */}{' '}
                             <div>
                                 <Label htmlFor="search">Search</Label>
                                 <SearchInput
-                                    id="search"
                                     placeholder="Search activities..."
                                     value={searchQuery}
                                     onChange={setSearchQuery}

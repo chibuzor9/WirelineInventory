@@ -46,10 +46,9 @@ export async function generateReportPDF(data: ReportData): Promise<Buffer> {
                 <div style="font-size: 10px; color: #666; width: 100%; text-align: center; margin: 0 20px;">
                     <span>Page <span class="pageNumber"></span> of <span class="totalPages"></span> | Generated on ${ data.generatedAt.toLocaleDateString() }</span>
                 </div>
-            `
-        });
+            `        });
 
-        return pdf;
+        return Buffer.from(pdf);
     } finally {
         await browser.close();
     }
@@ -280,12 +279,11 @@ function generateReportHTML(data: ReportData): string {
                     ${ startDate ? `<div><strong>Date From:</strong> ${ new Date(startDate).toLocaleDateString() }</div>` : '' }
                     ${ endDate ? `<div><strong>Date To:</strong> ${ new Date(endDate).toLocaleDateString() }</div>` : '' }
                 </div>
-                
-                <div class="meta-section">
+                  <div class="meta-section">
                     <div class="meta-title">Summary</div>
                     <div><strong>Total Tools:</strong> ${ filteredTools.length }</div>
-                    <div><strong>Categories:</strong> ${ [...new Set(filteredTools.map(t => t.category))].length }</div>
-                    <div><strong>Locations:</strong> ${ [...new Set(filteredTools.map(t => t.location).filter(Boolean))].length }</div>
+                    <div><strong>Categories:</strong> ${ Array.from(new Set(filteredTools.map(t => t.category))).length }</div>
+                    <div><strong>Locations:</strong> ${ Array.from(new Set(filteredTools.map(t => t.location).filter(Boolean))).length }</div>
                 </div>
             </div>
             

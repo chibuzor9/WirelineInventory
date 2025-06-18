@@ -4,12 +4,13 @@ import themePlugin from "@replit/vite-plugin-shadcn-theme-json";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
     plugins: [
         react(),
-        runtimeErrorOverlay(),
+        // Only include runtime error overlay in development
+        mode === 'development' && runtimeErrorOverlay(),
         themePlugin(),
-    ],
+    ].filter(Boolean),
     resolve: {
         alias: {
             "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -22,10 +23,20 @@ export default defineConfig({
     build: {
         outDir: path.resolve(import.meta.dirname, "dist/public"),
         emptyOutDir: true,
+        sourcemap: mode === 'development',
+        minify: mode === 'production',
     },
     server: {
         proxy: {
-            "/api": "http://localhost:5000"
+            "/api": {
+                target: "http://localhost:5000",
+                changeOrigin: true,
+                secure: false,
+            }
         }
+    },
+    preview: {
+        port: 4173,
+        host: true,
     }
-});
+}));
