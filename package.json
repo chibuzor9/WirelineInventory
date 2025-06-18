@@ -10,7 +10,7 @@
         "build": "npm run build:client && npm run build:server",
         "build:client": "vite build",
         "build:server": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --target=node18 --minify",
-        "vercel-build": "npm run build:client",
+        "vercel-build": "npm run build",
         "start": "node dist/index.js",
         "start:prod": "cross-env NODE_ENV=production node dist/index.js",
         "start:test": "cross-env NODE_ENV=test node dist/index.js",
