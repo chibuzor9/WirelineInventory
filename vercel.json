@@ -2,13 +2,6 @@
     "version": 2,
     "builds": [
         {
-            "src": "server/index.ts",
-            "use": "@vercel/node",
-            "config": {
-                "maxDuration": 30
-            }
-        },
-        {
             "src": "package.json",
             "use": "@vercel/static-build",
             "config": {
@@ -18,15 +11,13 @@
     ],
     "routes": [
         {
-            "src": "/api/(.*)",
-            "dest": "/server/index.ts"
-        },
-        {
             "src": "/(.*)",
             "dest": "/dist/public/$1"
         }
     ],
-    "env": {
-        "NODE_ENV": "production"
+    "functions": {
+        "api/index.ts": {
+            "maxDuration": 30
+        }
     }
 }
