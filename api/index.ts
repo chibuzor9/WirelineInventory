@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import express from 'express';
 import session from 'express-session';
-import { apiStorage } from './storage';
+import { apiStorage } from './storage.js';
 import { z } from 'zod';
 
 // Extend session type
