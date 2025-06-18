@@ -7,7 +7,6 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 export default defineConfig(({ mode }) => ({
     plugins: [
         react(),
-        // Only include runtime error overlay in development
         mode === 'development' && runtimeErrorOverlay(),
         themePlugin(),
     ].filter(Boolean),
@@ -21,7 +20,7 @@ export default defineConfig(({ mode }) => ({
     root: path.resolve(import.meta.dirname, "client"),
     envDir: path.resolve(import.meta.dirname),
     build: {
-        outDir: path.resolve(import.meta.dirname, "dist/public"),
+        outDir: path.resolve(import.meta.dirname, "public"),
         emptyOutDir: true,
         sourcemap: mode === 'development',
         minify: mode === 'production',
