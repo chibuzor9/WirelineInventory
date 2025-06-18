@@ -3,11 +3,7 @@
     "builds": [
         {
             "src": "server/index.ts",
-            "use": "@vercel/node",
-            "config": {
-                "includeFiles": ["dist/public/**", "shared/**", "server/**"],
-                "maxDuration": 30
-            }
+            "use": "@vercel/node"
         },
         {
             "src": "package.json",
@@ -29,5 +25,10 @@
     ],
     "env": {
         "NODE_ENV": "production"
+    },
+    "functions": {
+        "server/index.ts": {
+            "maxDuration": 30
+        }
     }
 }

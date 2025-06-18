@@ -66,6 +66,11 @@ function validateConfig(): void {
         console.error('Current NODE_ENV:', process.env.NODE_ENV);
         process.exit(1);
     }
+
+    // Warn about session secret in production
+    if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+        console.warn('WARNING: SESSION_SECRET not set in production. Using fallback secret.');
+    }
 }
 
 function createConfig(): Config {
@@ -98,9 +103,8 @@ function createConfig(): Config {
                     process.env.PRODUCTION_URL || '',
                 ].filter(Boolean)
                 : ['http://localhost:5000', 'http://localhost:5173', 'http://localhost:4173'],
-        },
-        session: {
-            secret: process.env.SESSION_SECRET || 'your-session-secret-change-in-production',
+        }, session: {
+            secret: process.env.SESSION_SECRET || 'halliburton-inventory-fallback-secret-change-in-production',
             secure: nodeEnv === 'production',
         },
     };

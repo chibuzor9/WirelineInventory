@@ -109,13 +109,18 @@ function getNotificationTitle(action: string, details: string): string {
 
 export async function registerRoutes(app: Express): Promise<Server> {
     setupAuth(app);
-    addHealthCheck(app);
-
-    app.post(
+    addHealthCheck(app); app.post(
         '/api/login',
         async (req: Request, res: Response, next: NextFunction) => {
             try {
                 const { username, password } = req.body;
+
+                // Validate input
+                if (!username || !password) {
+                    console.log('[LOGIN FAIL] Missing username or password');
+                    return res.status(400).json({ message: 'Username and password are required' });
+                }
+
                 console.log(`[LOGIN ATTEMPT] username: ${ username }`);
                 const user = await storage.getUserByUsername(username);
 
@@ -123,7 +128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     console.log(
                         `[LOGIN FAIL] username: ${ username } (user not found)`,
                     );
-                    return res.status(401).send('Invalid username or password');
+                    return res.status(401).json({ message: 'Invalid username or password' });
                 }
 
                 // Password comparison based on user role
@@ -143,18 +148,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     console.log(
                         `[LOGIN FAIL] username: ${ username } (wrong password)`,
                     );
-                    return res.status(401).send('Invalid username or password');
-                }                // Store userId in session
-                req.session.userId = Number(user.id); console.log(
+                    return res.status(401).json({ message: 'Invalid username or password' });
+                }
+
+                // Store userId in session
+                req.session.userId = Number(user.id);
+
+                console.log(
                     `[LOGIN SUCCESS] username: ${ username }, id: ${ Number(user.id) }`,
                 );
+
                 res.json(user);
             } catch (error) {
                 console.error(
                     `[LOGIN ERROR] username: ${ req.body?.username }`,
                     error,
                 );
-                next(error);
+                res.status(500).json({ message: 'Internal server error during login' });
             }
         },
     );
