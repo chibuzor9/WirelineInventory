@@ -85,12 +85,12 @@ type InsertUser = z.infer<typeof insertUserSchema>;
 
 // Routes
 // Health check
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Login
-app.post('/login', async (req, res) => {
+app.post('/api/login', async (req, res) => {
     try {
         console.log('[API] Login attempt');
         const { username, password } = req.body;
@@ -128,8 +128,30 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// Register
-app.post('/register', async (req, res) => {
+// Logout
+app.post('/api/logout', (req, res) => {
+    req.session.destroy(() => {
+        res.status(200).json({ message: 'Logged out' });
+    });
+});
+
+// Get current user
+app.get('/api/me', async (req, res) => {
+    try {
+        if (!isAuthenticated(req)) return res.sendStatus(401);
+
+        const user = await getUserFromSession(req);
+        if (!user) return res.sendStatus(401);
+
+        res.json(user);
+    } catch (error) {
+        console.error('[API] Get user error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// Register a new user
+app.post('/api/register', async (req, res) => {
     try {
         console.log('[API] Registration attempt');
         const { username, password, full_name, email } = req.body;
@@ -175,28 +197,6 @@ app.post('/register', async (req, res) => {
             res.status(500).json({ message: 'Internal server error during registration' });
         }
     }
-});
-
-// Get current user
-app.get('/user', async (req, res) => {
-    try {
-        if (!isAuthenticated(req)) return res.sendStatus(401);
-
-        const user = await getUserFromSession(req);
-        if (!user) return res.sendStatus(401);
-
-        res.json(user);
-    } catch (error) {
-        console.error('[API] Get user error:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-});
-
-// Logout
-app.post('/logout', (req, res) => {
-    req.session.destroy(() => {
-        res.status(200).json({ message: 'Logged out' });
-    });
 });
 
 // Export handler for Vercel
