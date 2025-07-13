@@ -16,6 +16,11 @@ export default function Sidebar() {
         { name: 'Activity Log', icon: 'ri-history-line', path: '/activity' },
     ];
 
+    // Add admin link for admin users
+    if (user?.role === 'admin') {
+        navItems.push({ name: 'User Management', icon: 'ri-user-settings-line', path: '/admin' });
+    }
+
     const handleLogout = async () => {
         await logout();
     };

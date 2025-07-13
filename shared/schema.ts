@@ -13,11 +13,15 @@ export const users = pgTable("users", {
     role: varchar("role").default("user").notNull(),
     created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     status: smallint("status").default(1),
+    deleted_at: timestamp("deleted_at", { withTimezone: true }),
+    deletion_scheduled_at: timestamp("deletion_scheduled_at", { withTimezone: true }),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({
     id: true,
     created_at: true,
+    deleted_at: true,
+    deletion_scheduled_at: true,
 });
 
 // Tool model

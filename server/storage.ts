@@ -19,7 +19,12 @@ const MemoryStore = createMemoryStore(session);
 export interface IStorage {
     getUser(id: number): Promise<User | undefined>;
     getUserByUsername(username: string): Promise<User | undefined>;
+    getAllUsers(): Promise<User[]>;
     createUser(user: InsertUser): Promise<User>;
+    scheduleUserDeletion(id: number, scheduledAt: Date): Promise<void>;
+    cancelUserDeletion(id: number): Promise<void>;
+    permanentlyDeleteUser(id: number): Promise<boolean>;
+    getUsersScheduledForDeletion(): Promise<User[]>;
     getTool(id: number): Promise<Tool | undefined>;
     getToolByToolId(toolId: string): Promise<Tool | undefined>;
     getTools(options?: {
@@ -33,6 +38,7 @@ export interface IStorage {
     updateTool(id: number, tool: Partial<Tool>): Promise<Tool | undefined>;
     deleteTool(id: number): Promise<boolean>;
     createActivity(activity: InsertActivity): Promise<Activity>;
+    logActivity(activity: Omit<InsertActivity, 'user_id'> & { user_id: number }): Promise<Activity>;
     getActivities(limit?: number): Promise<Activity[]>;
     getToolStats(): Promise<{
         red: number;
@@ -40,6 +46,7 @@ export interface IStorage {
         green: number;
         white: number;
     }>;
+    getToolsByStatus(statuses: string[]): Promise<Tool[]>;
     sessionStore: session.Store;
 }
 
@@ -248,7 +255,7 @@ export class SupabaseStorage implements IStorage {
             new Set(activitiesData.map((a) => a.user_id).filter(Boolean)),
         );
         const toolIds = Array.from(
-            new Set(activitiesData.map((a) => a.tool_id).filter(Boolean)),
+            new Set(activitiesData.map((a) => a.toolId).filter(Boolean)),
         );
 
         // Fetch users and tools separately
@@ -262,7 +269,7 @@ export class SupabaseStorage implements IStorage {
             toolIds.length > 0
                 ? supabase
                     .from('tools')
-                    .select('id, tool_id, name, status')
+                    .select('id, toolId, name, status')
                     .in('id', toolIds)
                 : { data: [], error: null },
         ]);
@@ -275,7 +282,7 @@ export class SupabaseStorage implements IStorage {
         const enrichedActivities = activitiesData.map((activity) => ({
             ...activity,
             user: activity.user_id ? usersMap.get(activity.user_id) : null,
-            tool: activity.tool_id ? toolsMap.get(activity.tool_id) : null,
+            tool: activity.toolId ? toolsMap.get(activity.toolId) : null,
         }));
 
         return enrichedActivities as Activity[];
@@ -343,6 +350,78 @@ export class SupabaseStorage implements IStorage {
         }
 
         return data as Tool[];
+    }
+
+    async getAllUsers(): Promise<User[]> {
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            throw new Error('Error fetching users: ' + error.message);
+        }
+
+        return data as User[];
+    }
+
+    async scheduleUserDeletion(id: number, scheduledAt: Date): Promise<void> {
+        const { error } = await supabase
+            .from('users')
+            .update({ 
+                deletion_scheduled_at: scheduledAt.toISOString(),
+                status: 0 // Mark as inactive
+            })
+            .eq('id', id);
+
+        if (error) {
+            throw new Error('Error scheduling user deletion: ' + error.message);
+        }
+    }
+
+    async cancelUserDeletion(id: number): Promise<void> {
+        const { error } = await supabase
+            .from('users')
+            .update({ 
+                deletion_scheduled_at: null,
+                status: 1 // Mark as active
+            })
+            .eq('id', id);
+
+        if (error) {
+            throw new Error('Error cancelling user deletion: ' + error.message);
+        }
+    }
+
+    async permanentlyDeleteUser(id: number): Promise<boolean> {
+        const { error } = await supabase
+            .from('users')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            throw new Error('Error permanently deleting user: ' + error.message);
+        }
+
+        return true;
+    }
+
+    async getUsersScheduledForDeletion(): Promise<User[]> {
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .not('deletion_scheduled_at', 'is', null)
+            .order('deletion_scheduled_at', { ascending: true });
+
+        if (error) {
+            throw new Error('Error fetching users scheduled for deletion: ' + error.message);
+        }
+
+        return data as User[];
+    }
+
+    async logActivity(activity: Omit<InsertActivity, 'user_id'> & { user_id: number }): Promise<Activity> {
+        return this.createActivity(activity as InsertActivity);
     }
 }
 
