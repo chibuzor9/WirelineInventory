@@ -1,9 +1,9 @@
 {
   "functions": {
-    "api/index.js": {
+    "api/index.ts": {
       "maxDuration": 60
     },
-    "api/cleanup-cron.js": {
+    "api/cleanup-cron.ts": {
       "maxDuration": 30
     }
   },
@@ -16,7 +16,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.js"
+      "destination": "/api/index.ts"
     },
     {
       "source": "/(.*)",
