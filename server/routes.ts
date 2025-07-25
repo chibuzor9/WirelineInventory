@@ -1,10 +1,10 @@
 import type { Express, Request, Response, NextFunction } from 'express';
 import { createServer, type Server } from 'http';
-import { storage, IStorage } from './storage';
-import { supabase } from './db';
-import { setupAuth } from './auth';
-import { emailService } from './email';
-import { userCleanupService } from './cleanup';
+import { storage, IStorage } from './storage.js';
+import { supabase } from './db.js';
+import { setupAuth } from './auth.js';
+import { emailService } from './email.js';
+import { userCleanupService } from './cleanup.js';
 import {
     insertToolSchema,
     insertUserSchema,

@@ -1,7 +1,7 @@
 import type { Express } from 'express';
-import { setupAuth } from './auth';
-import { userCleanupService } from './cleanup';
-import { registerRoutes as registerMainRoutes } from './routes';
+import { setupAuth } from './auth.js';
+import { userCleanupService } from './cleanup.js';
+import { registerRoutes as registerMainRoutes } from './routes.js';
 
 export async function setupVercelApp(app: Express): Promise<void> {
     // Setup authentication middleware

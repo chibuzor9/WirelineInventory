@@ -1,5 +1,5 @@
-import { storage } from './storage';
-import { emailService } from './email';
+import { storage } from './storage.js';
+import { emailService } from './email.js';
 
 export class UserCleanupService {
     private isRunning: boolean = false;

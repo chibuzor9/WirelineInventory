@@ -1,6 +1,6 @@
 import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
-import { supabase } from "./db";
+import { supabase } from "./db.js";
 
 declare global {
   namespace Express {
