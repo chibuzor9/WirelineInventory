@@ -382,7 +382,6 @@ export default function ActivityPage() {
                             <div>
                                 <Label htmlFor="search">Search</Label>
                                 <SearchInput
-                                    id="search"
                                     placeholder="Search activities..."
                                     value={searchQuery}
                                     onChange={setSearchQuery}

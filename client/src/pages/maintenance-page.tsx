@@ -513,7 +513,7 @@ export default function MaintenancePage() {
                                                 className="hover:bg-muted/50"
                                             >
                                                 <TableCell className="font-medium">
-                                                    {tool.toolId}
+                                                    {tool.tool_id}
                                                 </TableCell>
                                                 <TableCell>
                                                     {tool.name}
@@ -528,7 +528,7 @@ export default function MaintenancePage() {
                                                 </TableCell>
                                                 <TableCell>
                                                     {formatDate(
-                                                        tool.lastUpdated,
+                                                        tool.last_updated?.toString(),
                                                     )}
                                                 </TableCell>
                                                 <TableCell>

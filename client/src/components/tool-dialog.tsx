@@ -93,7 +93,7 @@ export default function ToolDialog({
         if (open && (isEditMode || isViewMode) && tool) {
             setOriginalStatus(tool.status);
             form.reset({
-                toolId: tool.toolId,
+                toolId: tool.tool_id,
                 name: tool.name,
                 category: tool.category,
                 description: tool.description || '',
@@ -119,7 +119,7 @@ export default function ToolDialog({
         mutationFn: async (data: ToolFormValues) => {
             const response = await apiRequest('POST', '/api/tools', {
                 ...data,
-                lastUpdated: new Date().toISOString(),
+                last_updated: new Date().toISOString(),
             });
             return response.json();
         },
@@ -147,7 +147,7 @@ export default function ToolDialog({
             if (!tool) return null;
             const payload = {
                 ...data,
-                lastUpdated: new Date().toISOString(),
+                last_updated: new Date().toISOString(),
                 // Include comment and previous status for tag changes
                 ...(data.status !== originalStatus && {
                     comment: data.comment || '',
@@ -474,7 +474,7 @@ export default function ToolDialog({
                                     </Label>
                                     <p className="text-sm font-medium">
                                         {new Date(
-                                            tool.lastUpdated,
+                                            tool.last_updated,
                                         ).toLocaleString()}
                                     </p>
                                 </div>

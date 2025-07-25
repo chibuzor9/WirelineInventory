@@ -32,13 +32,13 @@ export function generateCSV(data: ExportData): string {
 
     // Create CSV rows
     const rows = filteredTools.map(tool => [
-        tool.toolId,
+        tool.tool_id,
         tool.name,
         tool.category,
         tool.status,
         tool.location || '',
         tool.description || '',
-        new Date(tool.lastUpdated).toLocaleDateString()
+        new Date(tool.last_updated).toLocaleDateString()
     ]);
 
     // Combine headers and rows
@@ -85,13 +85,13 @@ export function generateExcel(data: ExportData): Buffer {
     const toolsData = [
         ['Tool ID', 'Name', 'Category', 'Status', 'Location', 'Description', 'Last Updated'],
         ...filteredTools.map(tool => [
-            tool.toolId,
+            tool.tool_id,
             tool.name,
             tool.category,
             tool.status,
             tool.location || '',
             tool.description || '',
-            new Date(tool.lastUpdated).toLocaleDateString()
+            new Date(tool.last_updated).toLocaleDateString()
         ])
     ];
 

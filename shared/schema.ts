@@ -1,16 +1,16 @@
-import { pgTable, text, serial, integer, timestamp, primaryKey, foreignKey, bigint, varchar, smallint } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, primaryKey, foreignKey, bigint, varchar, smallint, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
 // User model
 export const users = pgTable("users", {
-    id: bigint("id", { mode: "bigint" }).primaryKey(),
-    username: varchar("username").notNull().unique(),
+    id: uuid("id").primaryKey().defaultRandom(),
+    username: varchar("username", { length: 255 }).notNull().unique(),
     password: text("password").notNull(),
     full_name: text("full_name").notNull(),
-    email: varchar("email").notNull(),
-    role: varchar("role").default("user").notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    role: varchar("role", { length: 50 }).default("user").notNull(),
     created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     status: smallint("status").default(1),
     deleted_at: timestamp("deleted_at", { withTimezone: true }),
@@ -26,19 +26,19 @@ export const insertUserSchema = createInsertSchema(users).omit({
 
 // Tool model
 export const tools = pgTable("tools", {
-    id: serial("id").primaryKey(),
-    toolId: text("tool_id").notNull().unique(),
+    id: uuid("id").primaryKey().defaultRandom(),
+    tool_id: text("tool_id").notNull().unique(),
     name: text("name").notNull(),
     category: text("category").notNull(),
     description: text("description"),
-    status: text("status").notNull(), // 'red', 'yellow', 'green'
+    status: text("status").notNull(), // 'red', 'yellow', 'green', 'white'
     location: text("location"),
-    lastUpdated: timestamp("last_updated").notNull(),
-    lastUpdatedBy: bigint("last_updated_by", { mode: "bigint" }).notNull(),
+    last_updated: timestamp("last_updated").notNull().defaultNow(),
+    last_updated_by: uuid("last_updated_by").notNull(),
 }, (table: any) => {
     return {
         lastUpdatedByFk: foreignKey({
-            columns: [table.lastUpdatedBy],
+            columns: [table.last_updated_by],
             foreignColumns: [users.id],
         })
     };
@@ -46,16 +46,16 @@ export const tools = pgTable("tools", {
 
 export const insertToolSchema = createInsertSchema(tools).omit({
     id: true,
-    lastUpdatedBy: true,
-    lastUpdated: true,
+    last_updated_by: true,
+    last_updated: true,
 });
 
 // Activity model
 export const activities = pgTable("activities", {
-    id: serial("id").primaryKey(),
-    user_id: integer("user_id").notNull(),
+    id: uuid("id").primaryKey().defaultRandom(),
+    user_id: uuid("user_id").notNull(),
     action: varchar("action", { length: 255 }).notNull(),
-    toolId: integer("toolId"),
+    toolId: uuid("toolId"),
     timestamp: timestamp("timestamp").defaultNow(),
     details: text("details"),
     comments: text("comments"),
@@ -85,7 +85,7 @@ export const usersRelations = relations(users, ({ many }: any) => ({
 
 export const toolsRelations = relations(tools, ({ one, many }: any) => ({
     updatedBy: one(users, {
-        fields: [tools.lastUpdatedBy],
+        fields: [tools.last_updated_by],
         references: [users.id],
         relationName: "user_tools",
     }),
@@ -97,7 +97,8 @@ export const activitiesRelations = relations(activities, ({ one }: any) => ({
         fields: [activities.user_id],
         references: [users.id],
         relationName: "user_activities",
-    }), tool: one(tools, {
+    }),
+    tool: one(tools, {
         fields: [activities.toolId],
         references: [tools.id],
         relationName: "tool_activities",
@@ -125,10 +126,10 @@ export type InsertTool = {
 export type Tool = typeof tools.$inferSelect;
 
 export type InsertActivity = {
-    user_id: number;
+    user_id: string;
     action: string;
-    tool_id?: number;
-    timestamp: Date;
+    toolId?: string;
+    timestamp?: Date;
     details?: string;
     comments?: string;
     previous_status?: string;

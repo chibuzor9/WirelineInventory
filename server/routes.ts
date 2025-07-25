@@ -22,7 +22,7 @@ declare module 'express-session' {
             access_token: string;
             [key: string]: any;
         };
-        userId?: number;
+        userId?: string;
     }
 }
 
@@ -111,7 +111,7 @@ export async function setupRoutes(app: Express): Promise<void> {
                     );
                     return res.status(401).send('Invalid username or password');
                 }                // Store userId in session
-                req.session.userId = Number(user.id); console.log(
+                req.session.userId = user.id; console.log(
                     `[LOGIN SUCCESS] username: ${ username }, id: ${ Number(user.id) }`,
                 );
                 res.json(user);
@@ -199,11 +199,13 @@ export async function setupRoutes(app: Express): Promise<void> {
             try {
                 if (!isAuthenticated(req)) return res.sendStatus(401);
 
-                const id = Number(req.params.id);
-                if (isNaN(id)) {
+                const id = req.params.id;
+                // UUID validation - check if it's a valid UUID format
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+                if (!uuidRegex.test(id)) {
                     return res
                         .status(400)
-                        .json({ message: 'Invalid ID format' });
+                        .json({ message: 'Invalid UUID format' });
                 }
 
                 const tool = await storage.getTool(id);
@@ -252,15 +254,15 @@ export async function setupRoutes(app: Express): Promise<void> {
                 const toolData = {
                     ...req.body,
                     lastUpdated: new Date(),
-                    lastUpdatedBy: Number(user.id),
+                    lastUpdatedBy: user.id,
                 };
 
                 const tool = await storage.createTool(toolData); await storage.createActivity({
-                    user_id: Number(user.id),
+                    user_id: user.id,
                     action: 'create',
                     toolId: tool.id,
                     timestamp: new Date(),
-                    details: `Created tool ${ tool.name } (${ tool.toolId }) with ${ tool.status } tag`,
+                    details: `Created tool ${ tool.name } (${ tool.tool_id }) with ${ tool.status } tag`,
                 });
 
                 res.status(201).json(tool);
@@ -286,11 +288,13 @@ export async function setupRoutes(app: Express): Promise<void> {
                 // Allow all authenticated users to edit tools
                 // Admin users can edit everything, regular users can edit status and comments
 
-                const id = Number(req.params.id);
-                if (isNaN(id)) {
+                const id = req.params.id;
+                // UUID validation - check if it's a valid UUID format
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+                if (!uuidRegex.test(id)) {
                     return res
                         .status(400)
-                        .json({ message: 'Invalid ID format' });
+                        .json({ message: 'Invalid UUID format' });
                 }
 
                 const existingTool = await storage.getTool(id);
@@ -313,7 +317,7 @@ export async function setupRoutes(app: Express): Promise<void> {
                 const toolUpdate = {
                     ...req.body,
                     lastUpdated: new Date(),
-                    lastUpdatedBy: Number(user.id),
+                    lastUpdatedBy: user.id,
                 };
 
                 const updatedTool = await storage.updateTool(id, toolUpdate);
@@ -323,21 +327,21 @@ export async function setupRoutes(app: Express): Promise<void> {
                     req.body.status !== existingTool.status
                 ) {
                     await storage.createActivity({
-                        user_id: Number(user.id),
+                        user_id: user.id,
                         action: 'update',
                         toolId: id,
                         timestamp: new Date(),
-                        details: `Changed tag for ${ updatedTool?.name } (${ updatedTool?.toolId }) from ${ existingTool.status } to ${ req.body.status }`,
+                        details: `Changed tag for ${ updatedTool?.name } (${ updatedTool?.tool_id }) from ${ existingTool.status } to ${ req.body.status }`,
                         comments: req.body.comment || '',
                         previous_status: existingTool.status,
                     });
                 } else {
                     await storage.createActivity({
-                        user_id: Number(user.id),
+                        user_id: user.id,
                         action: 'update',
                         toolId: id,
                         timestamp: new Date(),
-                        details: `Updated tool ${ updatedTool?.name } (${ updatedTool?.toolId })`,
+                        details: `Updated tool ${ updatedTool?.name } (${ updatedTool?.tool_id })`,
                         comments: req.body.comment || '',
                         previous_status: undefined,
                     });
@@ -370,11 +374,13 @@ export async function setupRoutes(app: Express): Promise<void> {
                     });
                 }
 
-                const id = Number(req.params.id);
-                if (isNaN(id)) {
+                const id = req.params.id;
+                // UUID validation - check if it's a valid UUID format
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+                if (!uuidRegex.test(id)) {
                     return res
                         .status(400)
-                        .json({ message: 'Invalid ID format' });
+                        .json({ message: 'Invalid UUID format' });
                 }
 
                 const tool = await storage.getTool(id);
@@ -383,11 +389,11 @@ export async function setupRoutes(app: Express): Promise<void> {
                 }
 
                 await storage.deleteTool(id); await storage.createActivity({
-                    user_id: Number(user.id),
+                    user_id: user.id,
                     action: 'delete',
                     toolId: id,
                     timestamp: new Date(),
-                    details: `Deleted tool ${ tool.name } (${ tool.toolId })`,
+                    details: `Deleted tool ${ tool.name } (${ tool.tool_id })`,
                 });
 
                 res.status(204).send();
@@ -511,7 +517,7 @@ export async function setupRoutes(app: Express): Promise<void> {
 
                 // Log the activity
                 await storage.createActivity({
-                    user_id: Number(user.id),
+                    user_id: user.id,
                     action: 'report',
                     timestamp: new Date(),
                     details: `Generated ${ req.body.reportType } report (${ format.toUpperCase() }) for ${ req.body.tags.join(', ') || 'all' } tagged tools`,
@@ -571,7 +577,7 @@ export async function setupRoutes(app: Express): Promise<void> {
                 email: validatedData.email,
                 role: validatedData.role,
             }; const user = await storage.createUser(userData);
-            req.session.userId = Number(user.id);
+            req.session.userId = user.id;
             res.status(201).json(user);
         } catch (error) {
             next(error);
@@ -647,7 +653,7 @@ export async function setupRoutes(app: Express): Promise<void> {
             
             // Log admin action
             await storage.logActivity({
-                user_id: Number(adminUser.id),
+                user_id: adminUser.id,
                 action: 'admin_create_user',
                 timestamp: new Date(),
                 details: `Created user: ${username} with role: ${role}`,
@@ -669,24 +675,24 @@ export async function setupRoutes(app: Express): Promise<void> {
             }
 
             const { userId } = req.params;
-            const targetUser = await storage.getUser(Number(userId));
+            const targetUser = await storage.getUser(userId);
             
             if (!targetUser) {
                 return res.status(404).json({ message: 'User not found' });
             }
 
             // Prevent admin from deleting themselves
-            if (Number(userId) === Number(adminUser.id)) {
+            if (userId === adminUser.id) {
                 return res.status(400).json({ message: 'Cannot delete your own account' });
             }
 
             // Schedule user for deletion (soft delete)
             const deletionScheduledAt = new Date();
-            await storage.scheduleUserDeletion(Number(userId), deletionScheduledAt);
+            await storage.scheduleUserDeletion(userId, deletionScheduledAt);
 
             // Log admin action
             await storage.logActivity({
-                user_id: Number(adminUser.id),
+                user_id: adminUser.id,
                 action: 'admin_schedule_deletion',
                 timestamp: new Date(),
                 details: `Scheduled user ${targetUser.username} for deletion in 30 days`,
@@ -723,18 +729,18 @@ export async function setupRoutes(app: Express): Promise<void> {
             }
 
             const { userId } = req.params;
-            const targetUser = await storage.getUser(Number(userId));
+            const targetUser = await storage.getUser(userId);
             
             if (!targetUser) {
                 return res.status(404).json({ message: 'User not found' });
             }
 
             // Restore user (cancel deletion)
-            await storage.cancelUserDeletion(Number(userId));
+            await storage.cancelUserDeletion(userId);
 
             // Log admin action
             await storage.logActivity({
-                user_id: Number(adminUser.id),
+                user_id: adminUser.id,
                 action: 'admin_restore_user',
                 timestamp: new Date(),
                 details: `Restored user ${targetUser.username} - cancelled scheduled deletion`,
@@ -799,7 +805,7 @@ export async function setupRoutes(app: Express): Promise<void> {
             
             // Log admin action
             await storage.logActivity({
-                user_id: Number(user.id),
+                user_id: user.id,
                 action: 'admin_manual_cleanup',
                 timestamp: new Date(),
                 details: `Manual cleanup: ${result.deletedUsers} deleted, ${result.remindersSent} reminders sent`,

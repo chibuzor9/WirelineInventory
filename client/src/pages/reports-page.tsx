@@ -598,7 +598,7 @@ export default function ReportsPage() {
                                                         className="hover:bg-muted/50"
                                                     >
                                                         <TableCell className="font-medium">
-                                                            {tool.toolId}
+                                                            {tool.tool_id}
                                                         </TableCell>
                                                         <TableCell>
                                                             {tool.name}
@@ -617,7 +617,7 @@ export default function ReportsPage() {
                                                         </TableCell>
                                                         <TableCell>
                                                             {new Date(
-                                                                tool.lastUpdated,
+                                                                tool.last_updated,
                                                             ).toLocaleDateString()}
                                                         </TableCell>
                                                     </TableRow>

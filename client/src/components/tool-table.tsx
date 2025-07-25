@@ -93,7 +93,7 @@ export default function ToolTable() {
     });
 
     const deleteMutation = useMutation({
-        mutationFn: async (id: number) => {
+        mutationFn: async (id: string) => {
             await apiRequest('DELETE', `/api/tools/${id}`);
         },
         onSuccess: () => {
@@ -313,7 +313,7 @@ export default function ToolTable() {
                                         className="hover:bg-neutral-50"
                                     >
                                         <TableCell className="font-medium">
-                                            {tool.toolId}
+                                            {tool.tool_id}
                                         </TableCell>
                                         <TableCell>{tool.name}</TableCell>
                                         <TableCell className="text-neutral-500">
@@ -325,7 +325,7 @@ export default function ToolTable() {
                                             )}
                                         </TableCell>
                                         <TableCell className="text-neutral-500">
-                                            {formatDate(tool.lastUpdated)}
+                                            {formatDate(tool.last_updated)}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex space-x-2">
@@ -545,7 +545,7 @@ export default function ToolTable() {
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
                             This will permanently delete the tool{' '}
-                            {selectedTool?.name} ({selectedTool?.toolId}). This
+                            {selectedTool?.name} ({selectedTool?.tool_id}). This
                             action cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>

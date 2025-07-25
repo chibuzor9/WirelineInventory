@@ -64,13 +64,13 @@ export class UserCleanupService {
                 // If deletion date has passed, permanently delete the user
                 if (daysUntilDeletion <= 0) {
                     try {
-                        await storage.permanentlyDeleteUser(Number(user.id));
+                        await storage.permanentlyDeleteUser(user.id);
                         deletedCount++;
                         console.log(`Permanently deleted user: ${user.username} (ID: ${user.id})`);
                         
                         // Log the permanent deletion
                         await storage.logActivity({
-                            user_id: Number(user.id),
+                            user_id: user.id,
                             action: 'system_permanent_deletion',
                             timestamp: now,
                             details: `User ${user.username} permanently deleted after 30-day grace period`,
@@ -92,7 +92,7 @@ export class UserCleanupService {
                         
                         // Log the reminder
                         await storage.logActivity({
-                            user_id: Number(user.id),
+                            user_id: user.id,
                             action: 'system_deletion_reminder',
                             timestamp: now,
                             details: `Sent ${daysUntilDeletion}-day deletion reminder to ${user.email}`,
@@ -135,7 +135,7 @@ export class UserCleanupService {
 
                 if (daysUntilDeletion <= 0) {
                     try {
-                        await storage.permanentlyDeleteUser(Number(user.id));
+                        await storage.permanentlyDeleteUser(user.id);
                         result.deletedUsers++;
                     } catch (error) {
                         result.errors.push(`Failed to delete user ${user.username}: ${error}`);
