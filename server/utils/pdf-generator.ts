@@ -49,7 +49,7 @@ export async function generateReportPDF(data: ReportData): Promise<Buffer> {
             `
         });
 
-        return pdf;
+        return Buffer.from(pdf);
     } finally {
         await browser.close();
     }
