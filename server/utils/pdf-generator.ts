@@ -323,7 +323,7 @@ function generateReportHTML(data: ReportData): string {
                 <tbody>
                     ${ filteredTools.map(tool => `
                         <tr>
-                            <td>${ tool.toolId }</td>
+                            <td>${ tool.tool_id }</td>
                             <td>${ tool.name }</td>
                             <td>${ tool.category }</td>
                             <td>
@@ -333,7 +333,7 @@ function generateReportHTML(data: ReportData): string {
                                 </span>
                             </td>
                             <td>${ tool.location || 'N/A' }</td>
-                            <td>${ new Date(tool.lastUpdated).toLocaleDateString() }</td>
+                            <td>${ new Date(tool.last_updated).toLocaleDateString() }</td>
                             ${ reportType === 'tag-status' ? `<td>${ tool.description || 'N/A' }</td>` : '' }
                         </tr>
                     `).join('') }

@@ -3,6 +3,8 @@ import { createServer, type Server } from 'http';
 import { storage, IStorage } from './storage';
 import { supabase } from './db';
 import { setupAuth } from './auth';
+import { emailService } from './email';
+import { userCleanupService } from './cleanup';
 import {
     insertToolSchema,
     insertUserSchema,
@@ -20,7 +22,7 @@ declare module 'express-session' {
             access_token: string;
             [key: string]: any;
         };
-        userId?: number;
+        userId?: string;
     }
 }
 
@@ -66,6 +68,20 @@ function getNotificationTitle(action: string, details: string): string {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+    await setupRoutes(app);
+    
+    const httpServer = createServer(app);
+    
+    // Start cleanup service for local development only
+    if (process.env.NODE_ENV === 'development') {
+        userCleanupService.start();
+    }
+    
+    return httpServer;
+}
+
+// Separate function for Vercel deployment (no HTTP server creation)
+export async function setupRoutes(app: Express): Promise<void> {
     setupAuth(app);
 
     app.post(
@@ -83,18 +99,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     return res.status(401).send('Invalid username or password');
                 }
 
-                // Password comparison based on user role
-                let isPasswordValid = false;
-                if (user.role === 'admin') {
-                    // For admin users, compare password directly (plain text)
-                    isPasswordValid = user.password === password;
-                } else {
-                    // For regular users, use bcrypt comparison (hashed passwords)
-                    isPasswordValid = await storage.comparePassword(
-                        password,
-                        user.password,
-                    );
-                }
+                // Password comparison - use bcrypt for all users
+                const isPasswordValid = await storage.comparePassword(
+                    password,
+                    user.password,
+                );
 
                 if (!isPasswordValid) {
                     console.log(
@@ -102,7 +111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     );
                     return res.status(401).send('Invalid username or password');
                 }                // Store userId in session
-                req.session.userId = Number(user.id); console.log(
+                req.session.userId = user.id; console.log(
                     `[LOGIN SUCCESS] username: ${ username }, id: ${ Number(user.id) }`,
                 );
                 res.json(user);
@@ -190,11 +199,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             try {
                 if (!isAuthenticated(req)) return res.sendStatus(401);
 
-                const id = Number(req.params.id);
-                if (isNaN(id)) {
+                const id = req.params.id;
+                // UUID validation - check if it's a valid UUID format
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+                if (!uuidRegex.test(id)) {
                     return res
                         .status(400)
-                        .json({ message: 'Invalid ID format' });
+                        .json({ message: 'Invalid UUID format' });
                 }
 
                 const tool = await storage.getTool(id);
@@ -243,15 +254,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const toolData = {
                     ...req.body,
                     lastUpdated: new Date(),
-                    lastUpdatedBy: Number(user.id),
+                    lastUpdatedBy: user.id,
                 };
 
                 const tool = await storage.createTool(toolData); await storage.createActivity({
-                    user_id: Number(user.id),
+                    user_id: user.id,
                     action: 'create',
                     toolId: tool.id,
                     timestamp: new Date(),
-                    details: `Created tool ${ tool.name } (${ tool.toolId }) with ${ tool.status } tag`,
+                    details: `Created tool ${ tool.name } (${ tool.tool_id }) with ${ tool.status } tag`,
                 });
 
                 res.status(201).json(tool);
@@ -277,11 +288,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 // Allow all authenticated users to edit tools
                 // Admin users can edit everything, regular users can edit status and comments
 
-                const id = Number(req.params.id);
-                if (isNaN(id)) {
+                const id = req.params.id;
+                // UUID validation - check if it's a valid UUID format
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+                if (!uuidRegex.test(id)) {
                     return res
                         .status(400)
-                        .json({ message: 'Invalid ID format' });
+                        .json({ message: 'Invalid UUID format' });
                 }
 
                 const existingTool = await storage.getTool(id);
@@ -304,7 +317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const toolUpdate = {
                     ...req.body,
                     lastUpdated: new Date(),
-                    lastUpdatedBy: Number(user.id),
+                    lastUpdatedBy: user.id,
                 };
 
                 const updatedTool = await storage.updateTool(id, toolUpdate);
@@ -314,21 +327,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     req.body.status !== existingTool.status
                 ) {
                     await storage.createActivity({
-                        user_id: Number(user.id),
+                        user_id: user.id,
                         action: 'update',
                         toolId: id,
                         timestamp: new Date(),
-                        details: `Changed tag for ${ updatedTool?.name } (${ updatedTool?.toolId }) from ${ existingTool.status } to ${ req.body.status }`,
+                        details: `Changed tag for ${ updatedTool?.name } (${ updatedTool?.tool_id }) from ${ existingTool.status } to ${ req.body.status }`,
                         comments: req.body.comment || '',
                         previous_status: existingTool.status,
                     });
                 } else {
                     await storage.createActivity({
-                        user_id: Number(user.id),
+                        user_id: user.id,
                         action: 'update',
                         toolId: id,
                         timestamp: new Date(),
-                        details: `Updated tool ${ updatedTool?.name } (${ updatedTool?.toolId })`,
+                        details: `Updated tool ${ updatedTool?.name } (${ updatedTool?.tool_id })`,
                         comments: req.body.comment || '',
                         previous_status: undefined,
                     });
@@ -361,11 +374,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     });
                 }
 
-                const id = Number(req.params.id);
-                if (isNaN(id)) {
+                const id = req.params.id;
+                // UUID validation - check if it's a valid UUID format
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+                if (!uuidRegex.test(id)) {
                     return res
                         .status(400)
-                        .json({ message: 'Invalid ID format' });
+                        .json({ message: 'Invalid UUID format' });
                 }
 
                 const tool = await storage.getTool(id);
@@ -374,11 +389,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
 
                 await storage.deleteTool(id); await storage.createActivity({
-                    user_id: Number(user.id),
+                    user_id: user.id,
                     action: 'delete',
                     toolId: id,
                     timestamp: new Date(),
-                    details: `Deleted tool ${ tool.name } (${ tool.toolId })`,
+                    details: `Deleted tool ${ tool.name } (${ tool.tool_id })`,
                 });
 
                 res.status(204).send();
@@ -502,7 +517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                 // Log the activity
                 await storage.createActivity({
-                    user_id: Number(user.id),
+                    user_id: user.id,
                     action: 'report',
                     timestamp: new Date(),
                     details: `Generated ${ req.body.reportType } report (${ format.toUpperCase() }) for ${ req.body.tags.join(', ') || 'all' } tagged tools`,
@@ -562,8 +577,241 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 email: validatedData.email,
                 role: validatedData.role,
             }; const user = await storage.createUser(userData);
-            req.session.userId = Number(user.id);
+            req.session.userId = user.id;
             res.status(201).json(user);
+        } catch (error) {
+            next(error);
+        }
+    });
+
+    // Admin user management endpoints
+    app.get('/api/admin/users', async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            if (!isAuthenticated(req)) return res.sendStatus(401);
+            
+            const user = await getUserFromSession(req);
+            if (!user || user.role !== 'admin') {
+                return res.status(403).json({ message: 'Access denied. Admin role required.' });
+            }
+
+            // Get all users including soft-deleted ones for admin view
+            const users = await storage.getAllUsers();
+            
+            // Filter out passwords and add additional info
+            const sanitizedUsers = users.map(u => ({
+                ...u,
+                password: undefined,
+                isScheduledForDeletion: !!u.deletion_scheduled_at,
+                daysToDeletion: u.deletion_scheduled_at ? 
+                    Math.ceil((new Date(u.deletion_scheduled_at).getTime() + (30 * 24 * 60 * 60 * 1000) - Date.now()) / (24 * 60 * 60 * 1000)) : null
+            }));
+
+            res.json(sanitizedUsers);
+        } catch (error) {
+            next(error);
+        }
+    });
+
+    app.post('/api/admin/users', async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            if (!isAuthenticated(req)) return res.sendStatus(401);
+            
+            const adminUser = await getUserFromSession(req);
+            if (!adminUser || adminUser.role !== 'admin') {
+                return res.status(403).json({ message: 'Access denied. Admin role required.' });
+            }
+
+            const { username, password, full_name, email, role = 'user' } = req.body;
+
+            if (!username || !password || !full_name || !email) {
+                return res.status(400).json({ message: 'All fields are required' });
+            }
+
+            // Check if user already exists
+            const existing = await storage.getUserByUsername(username);
+            if (existing) {
+                return res.status(409).json({ message: 'Username already exists' });
+            }
+
+            const validatedData = insertUserSchema.parse({
+                username,
+                password,
+                full_name,
+                email,
+                role
+            });
+
+            const userData: InsertUser = {
+                username: validatedData.username,
+                password: validatedData.password,
+                full_name: validatedData.full_name,
+                email: validatedData.email,
+                role: validatedData.role,
+            };
+
+            const user = await storage.createUser(userData);
+            
+            // Log admin action
+            await storage.logActivity({
+                user_id: adminUser.id,
+                action: 'admin_create_user',
+                timestamp: new Date(),
+                details: `Created user: ${username} with role: ${role}`,
+            });
+
+            res.status(201).json({ ...user, password: undefined });
+        } catch (error) {
+            next(error);
+        }
+    });
+
+    app.delete('/api/admin/users/:userId', async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            if (!isAuthenticated(req)) return res.sendStatus(401);
+            
+            const adminUser = await getUserFromSession(req);
+            if (!adminUser || adminUser.role !== 'admin') {
+                return res.status(403).json({ message: 'Access denied. Admin role required.' });
+            }
+
+            const { userId } = req.params;
+            const targetUser = await storage.getUser(userId);
+            
+            if (!targetUser) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+
+            // Prevent admin from deleting themselves
+            if (userId === adminUser.id) {
+                return res.status(400).json({ message: 'Cannot delete your own account' });
+            }
+
+            // Schedule user for deletion (soft delete)
+            const deletionScheduledAt = new Date();
+            await storage.scheduleUserDeletion(userId, deletionScheduledAt);
+
+            // Log admin action
+            await storage.logActivity({
+                user_id: adminUser.id,
+                action: 'admin_schedule_deletion',
+                timestamp: new Date(),
+                details: `Scheduled user ${targetUser.username} for deletion in 30 days`,
+            });
+
+            // Send email notification to user about scheduled deletion
+            try {
+                await emailService.sendDeletionWarningEmail(
+                    targetUser.email,
+                    targetUser.full_name,
+                    deletionScheduledAt
+                );
+            } catch (emailError) {
+                console.error('Failed to send deletion warning email:', emailError);
+                // Continue with the response even if email fails
+            }
+
+            res.json({ 
+                message: 'User scheduled for deletion in 30 days',
+                scheduledDeletionDate: new Date(deletionScheduledAt.getTime() + (30 * 24 * 60 * 60 * 1000))
+            });
+        } catch (error) {
+            next(error);
+        }
+    });
+
+    app.put('/api/admin/users/:userId/restore', async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            if (!isAuthenticated(req)) return res.sendStatus(401);
+            
+            const adminUser = await getUserFromSession(req);
+            if (!adminUser || adminUser.role !== 'admin') {
+                return res.status(403).json({ message: 'Access denied. Admin role required.' });
+            }
+
+            const { userId } = req.params;
+            const targetUser = await storage.getUser(userId);
+            
+            if (!targetUser) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+
+            // Restore user (cancel deletion)
+            await storage.cancelUserDeletion(userId);
+
+            // Log admin action
+            await storage.logActivity({
+                user_id: adminUser.id,
+                action: 'admin_restore_user',
+                timestamp: new Date(),
+                details: `Restored user ${targetUser.username} - cancelled scheduled deletion`,
+            });
+
+            // Send email notification to user about account restoration
+            try {
+                await emailService.sendAccountRestoredEmail(
+                    targetUser.email,
+                    targetUser.full_name
+                );
+            } catch (emailError) {
+                console.error('Failed to send account restored email:', emailError);
+                // Continue with the response even if email fails
+            }
+
+            res.json({ message: 'User restored successfully' });
+        } catch (error) {
+            next(error);
+        }
+    });
+
+    // Admin cleanup management endpoints
+    app.get('/api/admin/cleanup/status', async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            if (!isAuthenticated(req)) return res.sendStatus(401);
+            
+            const user = await getUserFromSession(req);
+            if (!user || user.role !== 'admin') {
+                return res.status(403).json({ message: 'Access denied. Admin role required.' });
+            }
+
+            const status = userCleanupService.getStatus();
+            const scheduledUsers = await storage.getUsersScheduledForDeletion();
+            
+            res.json({
+                cleanupService: status,
+                scheduledUsers: scheduledUsers.map(u => ({
+                    id: u.id,
+                    username: u.username,
+                    email: u.email,
+                    deletion_scheduled_at: u.deletion_scheduled_at,
+                    daysRemaining: u.deletion_scheduled_at ? 
+                        Math.ceil((new Date(u.deletion_scheduled_at).getTime() + (30 * 24 * 60 * 60 * 1000) - Date.now()) / (24 * 60 * 60 * 1000)) : null
+                }))
+            });
+        } catch (error) {
+            next(error);
+        }
+    });
+
+    app.post('/api/admin/cleanup/run', async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            if (!isAuthenticated(req)) return res.sendStatus(401);
+            
+            const user = await getUserFromSession(req);
+            if (!user || user.role !== 'admin') {
+                return res.status(403).json({ message: 'Access denied. Admin role required.' });
+            }
+
+            const result = await userCleanupService.runManualCleanup();
+            
+            // Log admin action
+            await storage.logActivity({
+                user_id: user.id,
+                action: 'admin_manual_cleanup',
+                timestamp: new Date(),
+                details: `Manual cleanup: ${result.deletedUsers} deleted, ${result.remindersSent} reminders sent`,
+            });
+
+            res.json(result);
         } catch (error) {
             next(error);
         }
@@ -620,7 +868,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
         },
     );
-
-    const httpServer = createServer(app);
-    return httpServer;
 }

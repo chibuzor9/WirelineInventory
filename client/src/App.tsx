@@ -9,6 +9,7 @@ import InventoryPage from '@/pages/inventory-page';
 import ReportsPage from '@/pages/reports-page';
 import MaintenancePage from '@/pages/maintenance-page';
 import ActivityPage from '@/pages/activity-page';
+import AdminPage from '@/pages/admin-page';
 import AuthPage from '@/pages/auth-page';
 import { AuthProvider } from '@/hooks/use-auth';
 import AppLayout from '@/components/layouts/app-layout';
@@ -51,6 +52,12 @@ function Router() {
             <Route path="/activity">
                 <AppLayout>
                     <ProtectedRoute path="/activity" component={ActivityPage} />
+                </AppLayout>
+            </Route>
+
+            <Route path="/admin">
+                <AppLayout>
+                    <ProtectedRoute path="/admin" component={AdminPage} adminOnly />
                 </AppLayout>
             </Route>
 

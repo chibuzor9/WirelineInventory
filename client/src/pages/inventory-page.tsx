@@ -290,7 +290,7 @@ export default function InventoryPage() {
                                             className="hover:bg-muted/50"
                                         >
                                             <TableCell className="font-medium">
-                                                {tool.toolId}
+                                                {tool.tool_id}
                                             </TableCell>
                                             <TableCell>{tool.name}</TableCell>
                                             <TableCell>
@@ -305,7 +305,7 @@ export default function InventoryPage() {
                                                 {tool.location || '—'}
                                             </TableCell>
                                             <TableCell>
-                                                {formatDate(tool.lastUpdated)}
+                                                {formatDate(tool.last_updated)}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex justify-end items-center space-x-1">
