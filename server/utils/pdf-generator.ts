@@ -1,5 +1,5 @@
 import puppeteer from 'puppeteer';
-import { Tool, ReportType, ToolTag } from '@shared/schema';
+import { Tool, ReportType, ToolTag } from '../../shared/schema.js';
 
 interface ReportData {
     tools: Tool[];

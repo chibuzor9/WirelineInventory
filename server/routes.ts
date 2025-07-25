@@ -12,7 +12,7 @@ import {
     toolCategorySchema,
     reportTypeSchema,
     type InsertUser,
-} from '@shared/schema';
+} from '../shared/schema.js';
 import { z } from 'zod';
 
 // Extend Express session type to include supabaseSession and userId

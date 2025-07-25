@@ -8,7 +8,7 @@ import {
     type InsertTool,
     type Activity,
     type InsertActivity,
-} from '@shared/schema';
+} from '../shared/schema.js';
 import { supabase } from './db.js';
 import session from 'express-session';
 import createMemoryStore from 'memorystore';
