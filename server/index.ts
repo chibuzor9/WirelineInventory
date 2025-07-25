@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { userCleanupService } from "./cleanup";
+import { registerRoutes } from "./routes.js";
+import { setupVite, serveStatic, log } from "./vite.js";
+import { userCleanupService } from "./cleanup.js";
 import 'dotenv/config'
 
 const app = express();

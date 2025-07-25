@@ -8,8 +8,8 @@ import {
     type InsertTool,
     type Activity,
     type InsertActivity,
-} from '@shared/schema';
-import { supabase } from './db';
+} from '../shared/schema.js';
+import { supabase } from './db.js';
 import session from 'express-session';
 import createMemoryStore from 'memorystore';
 import bcrypt from 'bcryptjs';

@@ -1,5 +1,5 @@
 import puppeteer from 'puppeteer';
-import { Tool, ReportType, ToolTag } from '@shared/schema';
+import { Tool, ReportType, ToolTag } from '../../shared/schema.js';
 
 interface ReportData {
     tools: Tool[];
@@ -49,7 +49,7 @@ export async function generateReportPDF(data: ReportData): Promise<Buffer> {
             `
         });
 
-        return pdf;
+        return Buffer.from(pdf);
     } finally {
         await browser.close();
     }

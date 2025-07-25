@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { Tool, ReportType, ToolTag } from '@shared/schema';
+import { Tool, ReportType, ToolTag } from '../../shared/schema.js';
 
 interface ExportData {
     tools: Tool[];
