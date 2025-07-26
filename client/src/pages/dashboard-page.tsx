@@ -42,9 +42,9 @@ export default function DashboardPage() {
     return (
         <>
             {/* Status Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {isStatsLoading ? (
-                    <div className="col-span-2 flex justify-center py-8">
+                    <div className="col-span-2 lg:col-span-4 flex justify-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin text-halliburton-red" />
                     </div>
                 ) : (
@@ -84,8 +84,8 @@ export default function DashboardPage() {
             <ToolTable />
 
             {/* Activity and Report Sections */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-                <div className="lg:col-span-2">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 mt-6">
+                <div className="xl:col-span-2">
                     <RecentActivity
                         activities={
                             Array.isArray(activitiesData) ? activitiesData : []

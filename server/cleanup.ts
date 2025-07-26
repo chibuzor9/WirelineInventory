@@ -4,9 +4,13 @@ import { emailService } from './email.js';
 export class UserCleanupService {
     private isRunning: boolean = false;
     private intervalId: NodeJS.Timeout | null = null;
+    private otpCleanupIntervalId: NodeJS.Timeout | null = null;
 
     // Run every 24 hours (86400000 ms)
     private readonly CLEANUP_INTERVAL = 24 * 60 * 60 * 1000;
+    
+    // Clean up OTP codes every hour
+    private readonly OTP_CLEANUP_INTERVAL = 60 * 60 * 1000;
     
     // Send reminder emails at these day thresholds
     private readonly REMINDER_DAYS = [7, 3, 1];
@@ -22,17 +26,27 @@ export class UserCleanupService {
 
         // Run immediately on startup
         this.runCleanup();
+        this.runOtpCleanup();
 
         // Then schedule to run every 24 hours
         this.intervalId = setInterval(() => {
             this.runCleanup();
         }, this.CLEANUP_INTERVAL);
+        
+        // Schedule OTP cleanup every hour
+        this.otpCleanupIntervalId = setInterval(() => {
+            this.runOtpCleanup();
+        }, this.OTP_CLEANUP_INTERVAL);
     }
 
     stop(): void {
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = null;
+        }
+        if (this.otpCleanupIntervalId) {
+            clearInterval(this.otpCleanupIntervalId);
+            this.otpCleanupIntervalId = null;
         }
         this.isRunning = false;
         console.log('User cleanup service stopped');
@@ -107,6 +121,16 @@ export class UserCleanupService {
 
         } catch (error) {
             console.error('Error during user cleanup:', error);
+        }
+    }
+    
+    private async runOtpCleanup(): Promise<void> {
+        try {
+            console.log('Running OTP cleanup...');
+            await storage.cleanupExpiredOtpCodes();
+            console.log('OTP cleanup completed successfully');
+        } catch (error) {
+            console.error('Error during OTP cleanup:', error);
         }
     }
 

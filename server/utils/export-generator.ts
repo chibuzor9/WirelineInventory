@@ -25,17 +25,19 @@ export function generateCSV(data: ExportData): string {
         'Name',
         'Category',
         'Status',
+        'Status Description',
         'Location',
         'Description',
         'Last Updated'
     ];
 
-    // Create CSV rows
+    // Create CSV rows with enhanced status information
     const rows = filteredTools.map(tool => [
         tool.tool_id,
         tool.name,
         tool.category,
-        tool.status,
+        tool.status.toUpperCase(),
+        getStatusLabel(tool.status),
         tool.location || '',
         tool.description || '',
         new Date(tool.last_updated).toLocaleDateString()
@@ -81,14 +83,14 @@ export function generateExcel(data: ExportData): Buffer {
     const summaryWs = XLSX.utils.aoa_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(wb, summaryWs, 'Summary');
 
-    // Create tools data worksheet
+    // Create tools data worksheet with enhanced status formatting
     const toolsData = [
         ['Tool ID', 'Name', 'Category', 'Status', 'Location', 'Description', 'Last Updated'],
         ...filteredTools.map(tool => [
             tool.tool_id,
             tool.name,
             tool.category,
-            tool.status,
+            `${tool.status.toUpperCase()} - ${getStatusLabel(tool.status)}`, // Enhanced status display
             tool.location || '',
             tool.description || '',
             new Date(tool.last_updated).toLocaleDateString()
@@ -96,10 +98,91 @@ export function generateExcel(data: ExportData): Buffer {
     ];
 
     const toolsWs = XLSX.utils.aoa_to_sheet(toolsData);
+    
+    // Apply styling to the tools worksheet
+    const range = XLSX.utils.decode_range(toolsWs['!ref'] || 'A1');
+    
+    // Style header row
+    for (let col = range.s.c; col <= range.e.c; col++) {
+        const headerCell = XLSX.utils.encode_cell({ r: 0, c: col });
+        if (!toolsWs[headerCell]) continue;
+        
+        toolsWs[headerCell].s = {
+            font: { bold: true, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "4F46E5" } },
+            alignment: { horizontal: "center" }
+        };
+    }
+    
+    // Style status column (column D, index 3) with colors based on status
+    for (let row = 1; row <= range.e.r; row++) {
+        const statusCell = XLSX.utils.encode_cell({ r: row, c: 3 }); // Status column
+        if (!toolsWs[statusCell]) continue;
+        
+        const toolIndex = row - 1;
+        if (toolIndex < filteredTools.length) {
+            const status = filteredTools[toolIndex].status;
+            let fillColor = "FFFFFF"; // Default white
+            let fontColor = "000000"; // Default black
+            
+            switch (status) {
+                case 'red':
+                    fillColor = "FEE2E2"; // Light red background
+                    fontColor = "DC2626"; // Red text
+                    break;
+                case 'yellow':
+                    fillColor = "FEF3C7"; // Light yellow background
+                    fontColor = "D97706"; // Orange text
+                    break;
+                case 'green':
+                    fillColor = "D1FAE5"; // Light green background
+                    fontColor = "059669"; // Green text
+                    break;
+                case 'white':
+                    fillColor = "F3F4F6"; // Light gray background
+                    fontColor = "6B7280"; // Gray text
+                    break;
+            }
+            
+            toolsWs[statusCell].s = {
+                fill: { fgColor: { rgb: fillColor } },
+                font: { color: { rgb: fontColor }, bold: true },
+                alignment: { horizontal: "center" }
+            };
+        }
+    }
+    
+    // Set column widths
+    toolsWs['!cols'] = [
+        { width: 12 }, // Tool ID
+        { width: 25 }, // Name
+        { width: 15 }, // Category
+        { width: 20 }, // Status
+        { width: 15 }, // Location
+        { width: 30 }, // Description
+        { width: 12 }  // Last Updated
+    ];
+    
     XLSX.utils.book_append_sheet(wb, toolsWs, 'Tools Data');
 
     // Generate buffer
     return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+
+// Helper function to get status labels
+function getStatusLabel(status: string): string {
+    switch (status) {
+        case 'red':
+            return 'Critical';
+        case 'yellow':
+            return 'Warning';
+        case 'green':
+            return 'Good';
+        case 'white':
+            return 'Inactive';
+        default:
+            return 'Unknown';
+    }
 }
 
 function getReportTypeLabel(reportType: ReportType): string {

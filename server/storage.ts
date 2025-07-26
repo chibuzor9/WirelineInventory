@@ -2,25 +2,29 @@ import {
     users,
     tools,
     activities,
+    otpCodes,
     type User,
     type InsertUser,
     type Tool,
     type InsertTool,
     type Activity,
     type InsertActivity,
+    type OtpCode,
+    type InsertOtpCode,
 } from '../shared/schema.js';
 import { supabase } from './db.js';
 import session from 'express-session';
-import createMemoryStore from 'memorystore';
+import ConnectPgSimple from 'connect-pg-simple';
 import bcrypt from 'bcryptjs';
 
-const MemoryStore = createMemoryStore(session);
+const PgSession = ConnectPgSimple(session);
 
 export interface IStorage {
     getUser(id: string): Promise<User | undefined>;
     getUserByUsername(username: string): Promise<User | undefined>;
     getAllUsers(): Promise<User[]>;
     createUser(user: InsertUser): Promise<User>;
+    updateUserPassword(id: string, newPassword: string): Promise<void>;
     scheduleUserDeletion(id: string, scheduledAt: Date): Promise<void>;
     cancelUserDeletion(id: string): Promise<void>;
     permanentlyDeleteUser(id: string): Promise<boolean>;
@@ -47,13 +51,24 @@ export interface IStorage {
         white: number;
     }>;
     getToolsByStatus(statuses: string[]): Promise<Tool[]>;
+    createOtpCode(otpCode: InsertOtpCode): Promise<OtpCode>;
+    getValidOtpCode(email: string, code: string, type: string): Promise<OtpCode | undefined>;
+    markOtpCodeAsUsed(id: string): Promise<boolean>;
+    cleanupExpiredOtpCodes(): Promise<void>;
+    markEmailAsVerified(userId: string): Promise<boolean>;
     sessionStore: session.Store;
 }
 
 export class SupabaseStorage implements IStorage {
     sessionStore: session.Store;
     constructor() {
-        this.sessionStore = new MemoryStore({ checkPeriod: 86400000 });
+        // Use PostgreSQL-backed sessions for production
+        this.sessionStore = new PgSession({
+            conString: process.env.DATABASE_URL,
+            tableName: 'user_sessions',
+            createTableIfMissing: true,
+            ttl: 24 * 60 * 60 // 24 hours
+        });
     }
 
     // User methods
@@ -70,15 +85,33 @@ export class SupabaseStorage implements IStorage {
     }
 
     async getUserByUsername(username: string): Promise<User | undefined> {
-        const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('username', username);
-        if (error) {
-            console.error('Error fetching user by username:', error);
+        try {
+            console.log(`[STORAGE] Fetching user by username: ${username}`);
+            const { data, error } = await supabase
+                .from('users')
+                .select('*')
+                .eq('username', username);
+            
+            if (error) {
+                console.error('Error fetching user by username:', {
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                    code: error.code
+                });
+                return undefined;
+            }
+            
+            console.log(`[STORAGE] Query result for ${username}:`, {
+                found: !!data?.[0],
+                count: data?.length || 0
+            });
+            
+            return data && data[0] ? (data[0] as User) : undefined;
+        } catch (err) {
+            console.error('Unexpected error in getUserByUsername:', err);
             return undefined;
         }
-        return data && data[0] ? (data[0] as User) : undefined;
     }
 
     async createUser(user: InsertUser): Promise<User> {
@@ -105,6 +138,22 @@ export class SupabaseStorage implements IStorage {
         }
 
         return data as User;
+    }
+
+    async updateUserPassword(id: string, newPassword: string): Promise<void> {
+        // Hash the new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        const { error } = await supabase
+            .from('users')
+            .update({ password: hashedPassword })
+            .eq('id', id);
+
+        if (error) {
+            throw new Error(
+                'Error updating password: ' + error.message,
+            );
+        }
     }
 
     // Helper method to check if password is already hashed
@@ -422,6 +471,81 @@ export class SupabaseStorage implements IStorage {
 
     async logActivity(activity: Omit<InsertActivity, 'user_id'> & { user_id: string }): Promise<Activity> {
         return this.createActivity(activity as InsertActivity);
+    }
+
+    async createOtpCode(otpCode: InsertOtpCode): Promise<OtpCode> {
+        const { data, error } = await supabase
+            .from('otp_codes')
+            .insert([otpCode])
+            .select()
+            .single();
+
+        if (error || !data) {
+            throw new Error(
+                'Error creating OTP code: ' + (error?.message || 'Unknown error'),
+            );
+        }
+
+        return data as OtpCode;
+    }
+
+    async getValidOtpCode(email: string, code: string, type: string): Promise<OtpCode | undefined> {
+        const { data, error } = await supabase
+            .from('otp_codes')
+            .select('*')
+            .eq('email', email)
+            .eq('code', code)
+            .eq('type', type)
+            .is('used_at', null)
+            .gt('expires_at', new Date().toISOString())
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+        if (error) {
+            console.error('Error fetching OTP code:', error);
+            return undefined;
+        }
+
+        return data && data[0] ? (data[0] as OtpCode) : undefined;
+    }
+
+    async markOtpCodeAsUsed(id: string): Promise<boolean> {
+        const { error } = await supabase
+            .from('otp_codes')
+            .update({ used_at: new Date().toISOString() })
+            .eq('id', id);
+
+        if (error) {
+            console.error('Error marking OTP code as used:', error);
+            return false;
+        }
+
+        return true;
+    }
+
+    async cleanupExpiredOtpCodes(): Promise<void> {
+        const { error } = await supabase
+            .from('otp_codes')
+            .delete()
+            .lt('expires_at', new Date().toISOString());
+
+        if (error) {
+            console.error('Error cleaning up expired OTP codes:', error);
+        }
+    }
+
+    async markEmailAsVerified(userId: string): Promise<boolean> {
+        const { error } = await supabase
+            .from('users')
+            .update({ email_verified: new Date().toISOString() })
+            .eq('id', userId);
+
+        if (error) {
+            console.error('Error marking email as verified:', error);
+            return false;
+        }
+
+        return true;
     }
 }
 

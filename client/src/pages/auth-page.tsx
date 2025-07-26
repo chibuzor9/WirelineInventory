@@ -9,6 +9,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Redirect, useLocation } from 'wouter';
 import { Loader2, Check, X } from 'lucide-react';
+import { useState } from 'react';
+import OtpVerification from '@/components/otp-verification';
+import PasswordReset from '@/components/password-reset';
+import { useToast } from '@/hooks/use-toast';
 
 // Extend the insert schema for login form
 const loginSchema = z.object({
@@ -50,6 +54,14 @@ export default function AuthPage() {
     const [, setLocation] = useLocation();
     const { user, login, register, isLoading, loginState, registerState } =
         useAuth();
+    const { toast } = useToast();
+    const [showOtpVerification, setShowOtpVerification] = useState(false);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [pendingUser, setPendingUser] = useState<{
+        email: string;
+        userId: string;
+        name: string;
+    } | null>(null);
 
     // Login form
     const loginForm = useForm<LoginData>({
@@ -90,7 +102,64 @@ export default function AuthPage() {
     const onRegisterSubmit = async (data: RegisterData) => {
         // Remove confirmPassword field before submitting
         const { confirmPassword, ...registerData } = data;
-        await register(registerData);
+        try {
+            const response = await fetch('/api/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(registerData),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Registration failed');
+            }
+
+            // Show OTP verification screen
+            setPendingUser({
+                email: registerData.email,
+                userId: result.userId,
+                name: registerData.full_name,
+            });
+            setShowOtpVerification(true);
+
+            toast({
+                title: 'Registration Successful!',
+                description: 'Please check your email for a verification code.',
+            });
+        } catch (error) {
+            console.error('Registration error:', error);
+            toast({
+                title: 'Registration Failed',
+                description:
+                    error instanceof Error
+                        ? error.message
+                        : 'Registration failed. Please try again.',
+                variant: 'destructive',
+            });
+        }
+    };
+
+    const handleEmailVerified = () => {
+        setShowOtpVerification(false);
+        setPendingUser(null);
+        toast({
+            title: 'Welcome!',
+            description: 'Your account has been created and verified successfully.',
+        });
+        // Redirect to login tab or auto-login
+        setLocation('/auth');
+    };
+
+    const handleBackToRegister = () => {
+        setShowOtpVerification(false);
+        setPendingUser(null);
+    };
+
+    const handleBackToLogin = () => {
+        setShowForgotPassword(false);
     };
 
     // Redirect if user is already logged in
@@ -98,101 +167,145 @@ export default function AuthPage() {
         return <Redirect to="/" />;
     }
 
+    // Show password reset screen if needed
+    if (showForgotPassword) {
+        return (
+            <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
+                <PasswordReset onBack={handleBackToLogin} />
+            </div>
+        );
+    }
+
+    // Show OTP verification screen if needed
+    if (showOtpVerification && pendingUser) {
+        return (
+            <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
+                <OtpVerification
+                    email={pendingUser.email}
+                    userId={pendingUser.userId}
+                    onVerified={handleEmailVerified}
+                    onBack={handleBackToRegister}
+                />
+            </div>
+        );
+    }
+
     return (
-        <div className="min-h-screen bg-neutral-50 flex flex-col md:flex-row">
-            {/* Hero section */}
-            <div className="bg-halliburton-blue md:w-1/2 p-8 flex flex-col justify-center">
+        <div className="min-h-screen bg-neutral-50 flex flex-col lg:flex-row">
+            {/* Hero section - Collapsible on mobile */}
+            <div className="bg-halliburton-blue lg:w-1/2 p-4 sm:p-6 lg:p-8 flex flex-col justify-center lg:min-h-screen">
                 <div className="max-w-md mx-auto text-white">
-                    <div className="flex items-center mb-6">
+                    <div className="flex items-center mb-3 sm:mb-4 lg:mb-6">
                         <div className="bg-halliburton-red rounded-lg p-2 mr-3">
-                            <i className="ri-stack-line text-white text-2xl"></i>
+                            <i className="ri-stack-line text-white text-lg sm:text-xl lg:text-2xl"></i>
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold">Halliburton</h1>
-                            <p className="text-sm text-white/80">
+                            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Halliburton</h1>
+                            <p className="text-xs sm:text-sm text-white/80">
                                 Wireline & Perforating
                             </p>
                         </div>
                     </div>
 
-                    <h2 className="text-3xl font-bold mb-4">
+                    <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-3 lg:mb-4">
                         Inventory Management System
                     </h2>
 
-                    <p className="text-white/80 mb-6">
+                    <p className="text-white/80 mb-3 sm:mb-4 lg:mb-6 text-sm sm:text-base">
                         Track your tools with our advanced tagging system.
                         Efficiently manage red, yellow, green, and white tagged
                         equipment for Wireline & Perforating operations.
                     </p>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                        <div className="bg-white/10 p-4 rounded-lg">
-                            <div className="flex items-center mb-2">
-                                <div className="w-8 h-8 rounded-full bg-tag-red/20 flex items-center justify-center text-tag-red mr-2">
-                                    <i className="ri-error-warning-line"></i>
+                    {/* Tag system - Hide on small mobile, show simplified on larger screens */}
+                    <div className="hidden sm:grid grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 sm:gap-3 lg:gap-4 mb-4 sm:mb-6 lg:mb-8">
+                        <div className="bg-white/10 p-2 sm:p-3 lg:p-4 rounded-lg">
+                            <div className="flex items-center mb-1 sm:mb-2">
+                                <div className="w-4 h-4 sm:w-6 sm:h-6 lg:w-8 lg:h-8 rounded-full bg-tag-red/20 flex items-center justify-center text-tag-red mr-2">
+                                    <i className="ri-error-warning-line text-xs sm:text-sm lg:text-base"></i>
                                 </div>
-                                <h3 className="font-medium">Red</h3>
+                                <h3 className="font-medium text-xs sm:text-sm lg:text-base">Red</h3>
                             </div>
-                            <p className="text-sm text-white/70">
+                            <p className="text-xs lg:text-sm text-white/70 hidden lg:block">
                                 Equipment requiring immediate maintenance or
                                 safety inspection
                             </p>
                         </div>
 
-                        <div className="bg-white/10 p-4 rounded-lg">
-                            <div className="flex items-center mb-2">
-                                <div className="w-8 h-8 rounded-full bg-tag-yellow/20 flex items-center justify-center text-tag-yellow mr-2">
-                                    <i className="ri-alert-line"></i>
+                        <div className="bg-white/10 p-2 sm:p-3 lg:p-4 rounded-lg">
+                            <div className="flex items-center mb-1 sm:mb-2">
+                                <div className="w-4 h-4 sm:w-6 sm:h-6 lg:w-8 lg:h-8 rounded-full bg-tag-yellow/20 flex items-center justify-center text-tag-yellow mr-2">
+                                    <i className="ri-alert-line text-xs sm:text-sm lg:text-base"></i>
                                 </div>
-                                <h3 className="font-medium">Yellow</h3>
+                                <h3 className="font-medium text-xs sm:text-sm lg:text-base">Yellow</h3>
                             </div>
-                            <p className="text-sm text-white/70">
+                            <p className="text-xs lg:text-sm text-white/70 hidden lg:block">
                                 Equipment requiring attention but still
                                 operational
                             </p>
                         </div>
 
-                        <div className="bg-white/10 p-4 rounded-lg">
-                            <div className="flex items-center mb-2">
-                                <div className="w-8 h-8 rounded-full bg-tag-green/20 flex items-center justify-center text-tag-green mr-2">
-                                    <i className="ri-checkbox-circle-line"></i>
+                        <div className="bg-white/10 p-2 sm:p-3 lg:p-4 rounded-lg">
+                            <div className="flex items-center mb-1 sm:mb-2">
+                                <div className="w-4 h-4 sm:w-6 sm:h-6 lg:w-8 lg:h-8 rounded-full bg-tag-green/20 flex items-center justify-center text-tag-green mr-2">
+                                    <i className="ri-checkbox-circle-line text-xs sm:text-sm lg:text-base"></i>
                                 </div>
-                                <h3 className="font-medium">Green</h3>
+                                <h3 className="font-medium text-xs sm:text-sm lg:text-base">Green</h3>
                             </div>
-                            <p className="text-sm text-white/70">
+                            <p className="text-xs lg:text-sm text-white/70 hidden lg:block">
                                 Equipment fully operational and ready for use
                             </p>
                         </div>
 
-                        <div className="bg-white/10 p-4 rounded-lg">
-                            <div className="flex items-center mb-2">
-                                <div className="w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-white mr-2">
-                                    <i className="ri-bookmark-line"></i>
+                        <div className="bg-white/10 p-2 sm:p-3 lg:p-4 rounded-lg">
+                            <div className="flex items-center mb-1 sm:mb-2">
+                                <div className="w-4 h-4 sm:w-6 sm:h-6 lg:w-8 lg:h-8 rounded-full bg-white/30 flex items-center justify-center text-white mr-2">
+                                    <i className="ri-bookmark-line text-xs sm:text-sm lg:text-base"></i>
                                 </div>
-                                <h3 className="font-medium">White</h3>
+                                <h3 className="font-medium text-xs sm:text-sm lg:text-base">White</h3>
                             </div>
-                            <p className="text-sm text-white/70">
+                            <p className="text-xs lg:text-sm text-white/70 hidden lg:block">
                                 Equipment pending inspection or categorization
                             </p>
+                        </div>
+                    </div>
+
+                    {/* Mobile tag indicators - Simple version */}
+                    <div className="flex sm:hidden justify-center space-x-4 mb-4">
+                        <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full bg-tag-red mr-1"></div>
+                            <span className="text-xs">Red</span>
+                        </div>
+                        <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full bg-tag-yellow mr-1"></div>
+                            <span className="text-xs">Yellow</span>
+                        </div>
+                        <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full bg-tag-green mr-1"></div>
+                            <span className="text-xs">Green</span>
+                        </div>
+                        <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full bg-white mr-1"></div>
+                            <span className="text-xs">White</span>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Auth forms section */}
-            <div className="md:w-1/2 p-8 flex items-center justify-center">
-                <Card className="w-full max-w-md">
-                    <CardHeader className="space-y-1">
-                        <CardTitle className="text-2xl font-bold text-center">
+            <div className="lg:w-1/2 p-3 sm:p-4 lg:p-8 flex items-center justify-center lg:min-h-screen">
+                <Card className="w-full max-w-md shadow-lg">
+                    <CardHeader className="space-y-1 p-3 sm:p-4 lg:p-6">
+                        <CardTitle className="text-lg sm:text-xl lg:text-2xl font-bold text-center">
                             Welcome Back
                         </CardTitle>
                     </CardHeader>
 
-                    <CardContent>
+                    <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
                         <Tabs defaultValue="login" className="w-full">
-                            <TabsList className="grid w-full grid-cols-2 mb-4">
-                                <TabsTrigger value="login">Login</TabsTrigger>
-                                <TabsTrigger value="register">
+                            <TabsList className="grid w-full grid-cols-2 mb-3 sm:mb-4">
+                                <TabsTrigger value="login" className="text-sm">Login</TabsTrigger>
+                                <TabsTrigger value="register" className="text-sm">
                                     Register
                                 </TabsTrigger>
                             </TabsList>
@@ -259,6 +372,16 @@ export default function AuthPage() {
                                         )}
                                         Sign In
                                     </Button>
+
+                                    <div className="text-center">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowForgotPassword(true)}
+                                            className="text-sm text-halliburton-blue hover:underline"
+                                        >
+                                            Forgot your password?
+                                        </button>
+                                    </div>
                                 </form>
                             </TabsContent>
 

@@ -70,12 +70,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Top Navigation */}
                 <header className="bg-white shadow-sm">
-                    <div className="flex items-center justify-between p-4">
-                        <div>
-                            <h1 className="text-xl font-semibold text-neutral-800">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-4">
+                        <div className="min-w-0">
+                            <h1 className="text-lg sm:text-xl font-semibold text-neutral-800 truncate">
                                 Inventory Dashboard
                             </h1>
-                            <p className="text-sm text-neutral-500">
+                            <p className="text-xs sm:text-sm text-neutral-500">
                                 Manage your tools and equipment
                             </p>
                         </div>
@@ -93,25 +93,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
                         </div>
 
                         {/* Notification and Help */}
-                        <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="relative"
+                                className="relative h-8 w-8 sm:h-10 sm:w-10"
                                 onClick={() => setIsNotificationModalOpen(true)}
                                 title="Notifications"
                             >
-                                <BellRing className="h-5 w-5 text-neutral-800" />
-                                <span className="absolute top-1 right-1 w-2 h-2 bg-halliburton-red rounded-full"></span>
+                                <BellRing className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-800" />
+                                <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-2 h-2 bg-halliburton-red rounded-full"></span>
                             </Button>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="hidden md:flex"
+                                className="hidden sm:flex h-8 w-8 sm:h-10 sm:w-10"
                                 onClick={() => setIsAboutModalOpen(true)}
                                 title="About this system"
                             >
-                                <HelpCircle className="h-5 w-5 text-neutral-800" />
+                                <HelpCircle className="h-4 w-4 sm:h-5 sm:w-5 text-neutral-800" />
                             </Button>
                         </div>
                     </div>
@@ -130,7 +130,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 </header>
 
                 {/* Content Area */}
-                <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-neutral-50">
+                <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-neutral-50">
                     {children}
                 </main>
             </div>

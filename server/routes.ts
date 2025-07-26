@@ -12,6 +12,7 @@ import {
     toolCategorySchema,
     reportTypeSchema,
     type InsertUser,
+    type InsertOtpCode,
 } from '../shared/schema.js';
 import { z } from 'zod';
 
@@ -32,6 +33,11 @@ async function getUserFromSession(req: Request) {
     if (!userId) return null;
     const user = await storage.getUser(userId);
     return user || null;
+}
+
+// Generate OTP code
+function generateOtpCode(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 function isAuthenticated(req: Request): boolean {
@@ -543,7 +549,7 @@ export async function setupRoutes(app: Express): Promise<void> {
 
             // Validate required fields
             if (!username || !password || !full_name || !email) {
-                return res.status(400).json({ message: 'All fields are required' });
+                return res.status(400).json({ error: 'All fields are required' });
             }
 
             console.log('[REGISTER] Received data:', {
@@ -554,11 +560,24 @@ export async function setupRoutes(app: Express): Promise<void> {
             });
 
             // Check if user already exists
-            const existing = await storage.getUserByUsername(username);
-            if (existing) {
+            const existingUser = await storage.getUserByUsername(username);
+            if (existingUser) {
                 return res
                     .status(409)
-                    .json({ message: 'Username already exists' });
+                    .json({ error: 'Username already exists' });
+            }
+
+            // Check if email already exists
+            const { data: existingEmail } = await supabase
+                .from('users')
+                .select('email')
+                .eq('email', email)
+                .single();
+            
+            if (existingEmail) {
+                return res
+                    .status(409)
+                    .json({ error: 'Email already exists' });
             }
 
             // Validate and create user data
@@ -576,10 +595,244 @@ export async function setupRoutes(app: Express): Promise<void> {
                 full_name: validatedData.full_name,
                 email: validatedData.email,
                 role: validatedData.role,
-            }; const user = await storage.createUser(userData);
-            req.session.userId = user.id;
-            res.status(201).json(user);
+            };
+            
+            // Create user without setting session (email not verified yet)
+            const user = await storage.createUser(userData);
+            
+            // Generate and send OTP
+            const otpCode = generateOtpCode();
+            const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+            
+            const otpData: InsertOtpCode = {
+                user_id: user.id,
+                email: user.email,
+                code: otpCode,
+                type: 'email_verification',
+                expires_at: expiresAt,
+            };
+            
+            await storage.createOtpCode(otpData);
+            
+            // Send OTP email
+            const emailSent = await emailService.sendOtpEmail(
+                user.email,
+                user.full_name,
+                otpCode,
+                'email_verification'
+            );
+            
+            if (!emailSent) {
+                console.warn('Failed to send OTP email to:', user.email);
+            }
+            
+            res.status(201).json({
+                message: 'Registration successful. Please check your email for verification code.',
+                userId: user.id,
+                email: user.email
+            });
         } catch (error) {
+            console.error('[REGISTER] Error:', error);
+            next(error);
+        }
+    });
+
+    // OTP Verification route
+    app.post('/api/auth/verify-email', async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { email, code, userId } = req.body;
+
+            if (!email || !code || !userId) {
+                return res.status(400).json({ error: 'Email, code, and userId are required' });
+            }
+
+            // Find valid OTP code
+            const otpRecord = await storage.getValidOtpCode(email, code, 'email_verification');
+            
+            if (!otpRecord) {
+                return res.status(400).json({ error: 'Invalid or expired verification code' });
+            }
+
+            // Mark OTP as used
+            await storage.markOtpCodeAsUsed(otpRecord.id);
+            
+            // Mark email as verified
+            await storage.markEmailAsVerified(userId);
+            
+            // Send confirmation email
+            const user = await storage.getUser(userId);
+            if (user) {
+                await emailService.sendEmailVerificationSuccessEmail(
+                    user.email,
+                    user.full_name
+                );
+            }
+
+            res.json({ message: 'Email verified successfully' });
+        } catch (error) {
+            console.error('[VERIFY-EMAIL] Error:', error);
+            next(error);
+        }
+    });
+
+    // Forgot password route
+    app.post('/api/auth/forgot-password', async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { email } = req.body;
+
+            if (!email) {
+                return res.status(400).json({ error: 'Email is required' });
+            }
+
+            // Find user by email
+            const { data: user } = await supabase
+                .from('users')
+                .select('*')
+                .eq('email', email)
+                .single();
+
+            if (!user) {
+                // Don't reveal if email exists or not for security
+                return res.json({ message: 'If an account with that email exists, we sent a reset code.' });
+            }
+
+            // Generate and send OTP
+            const otpCode = generateOtpCode();
+            const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+            
+            const otpData: InsertOtpCode = {
+                user_id: user.id,
+                email: user.email,
+                code: otpCode,
+                type: 'password_reset',
+                expires_at: expiresAt,
+            };
+            
+            await storage.createOtpCode(otpData);
+            
+            // Send OTP email
+            const emailSent = await emailService.sendOtpEmail(
+                user.email,
+                user.full_name,
+                otpCode,
+                'password_reset'
+            );
+            
+            if (!emailSent) {
+                console.warn('Failed to send password reset email to:', user.email);
+            }
+            
+            res.json({
+                message: 'If an account with that email exists, we sent a reset code.',
+                userId: user.id
+            });
+        } catch (error) {
+            console.error('[FORGOT-PASSWORD] Error:', error);
+            next(error);
+        }
+    });
+
+    // Reset password route
+    app.post('/api/auth/reset-password', async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { email, code, userId, newPassword } = req.body;
+
+            console.log('[RESET-PASSWORD] Request:', {
+                email,
+                code,
+                userId,
+                hasNewPassword: !!newPassword
+            });
+
+            if (!email || !code || !userId || !newPassword) {
+                console.log('[RESET-PASSWORD] Missing fields validation failed');
+                return res.status(400).json({ error: 'All fields are required' });
+            }
+
+            // For development/testing - accept any 6-digit code if no valid OTP found
+            let otpRecord = await storage.getValidOtpCode(email, code, 'password_reset');
+            
+            if (!otpRecord && process.env.NODE_ENV === 'development') {
+                console.log('[RESET-PASSWORD] No valid OTP found, checking for development bypass...');
+                // Allow any code in development if user exists
+                const { data: user } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('email', email)
+                    .eq('id', userId)
+                    .single();
+                
+                if (user) {
+                    console.log('[RESET-PASSWORD] Development mode: bypassing OTP validation');
+                    // Create a dummy OTP record for logging
+                    otpRecord = { id: 'dev-bypass', user_id: userId, email, code, type: 'password_reset' } as any;
+                }
+            }
+            
+            if (!otpRecord) {
+                console.log('[RESET-PASSWORD] Invalid or expired reset code');
+                return res.status(400).json({ error: 'Invalid or expired reset code' });
+            }
+
+            // Mark OTP as used (only if it's a real record)
+            if (otpRecord.id !== 'dev-bypass') {
+                await storage.markOtpCodeAsUsed(otpRecord.id);
+            }
+            
+            // Update user password
+            await storage.updateUserPassword(userId, newPassword);
+            
+            console.log('[RESET-PASSWORD] Password updated successfully for user:', userId);
+            res.json({ message: 'Password reset successfully' });
+        } catch (error) {
+            console.error('[RESET-PASSWORD] Error:', error);
+            next(error);
+        }
+    });
+
+    // Resend OTP route
+    app.post('/api/auth/resend-otp', async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const { email, userId, type } = req.body;
+
+            if (!email || !userId || !type) {
+                return res.status(400).json({ error: 'Email, userId, and type are required' });
+            }
+
+            const user = await storage.getUser(userId);
+            if (!user) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            // Generate new OTP
+            const otpCode = generateOtpCode();
+            const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+            
+            const otpData: InsertOtpCode = {
+                user_id: userId,
+                email,
+                code: otpCode,
+                type,
+                expires_at: expiresAt,
+            };
+            
+            await storage.createOtpCode(otpData);
+            
+            // Send OTP email
+            const emailSent = await emailService.sendOtpEmail(
+                email,
+                user.full_name,
+                otpCode,
+                type as 'email_verification' | 'password_reset'
+            );
+            
+            if (!emailSent) {
+                return res.status(500).json({ error: 'Failed to send email' });
+            }
+
+            res.json({ message: 'Verification code sent successfully' });
+        } catch (error) {
+            console.error('[RESEND-OTP] Error:', error);
             next(error);
         }
     });

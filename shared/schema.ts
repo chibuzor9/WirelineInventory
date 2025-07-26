@@ -10,6 +10,7 @@ export const users = pgTable("users", {
     password: text("password").notNull(),
     full_name: text("full_name").notNull(),
     email: varchar("email", { length: 255 }).notNull(),
+    email_verified: timestamp("email_verified", { withTimezone: true }),
     role: varchar("role", { length: 50 }).default("user").notNull(),
     created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     status: smallint("status").default(1),
@@ -17,11 +18,37 @@ export const users = pgTable("users", {
     deletion_scheduled_at: timestamp("deletion_scheduled_at", { withTimezone: true }),
 });
 
+// OTP table for email verification
+export const otpCodes = pgTable("otp_codes", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    user_id: uuid("user_id").notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    code: varchar("code", { length: 6 }).notNull(),
+    type: varchar("type", { length: 50 }).notNull(), // 'email_verification', 'password_reset'
+    expires_at: timestamp("expires_at", { withTimezone: true }).notNull(),
+    used_at: timestamp("used_at", { withTimezone: true }),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table: any) => {
+    return {
+        userIdFk: foreignKey({
+            columns: [table.user_id],
+            foreignColumns: [users.id],
+        })
+    };
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({
     id: true,
     created_at: true,
     deleted_at: true,
     deletion_scheduled_at: true,
+    email_verified: true,
+});
+
+export const insertOtpCodeSchema = createInsertSchema(otpCodes).omit({
+    id: true,
+    created_at: true,
+    used_at: true,
 });
 
 // Tool model
@@ -81,6 +108,15 @@ export const insertActivitySchema = createInsertSchema(activities).omit({
 export const usersRelations = relations(users, ({ many }: any) => ({
     tools: many(tools, { relationName: "user_tools" }),
     activities: many(activities, { relationName: "user_activities" }),
+    otpCodes: many(otpCodes, { relationName: "user_otp_codes" }),
+}));
+
+export const otpCodesRelations = relations(otpCodes, ({ one }: any) => ({
+    user: one(users, {
+        fields: [otpCodes.user_id],
+        references: [users.id],
+        relationName: "user_otp_codes",
+    }),
 }));
 
 export const toolsRelations = relations(tools, ({ one, many }: any) => ({
@@ -114,6 +150,15 @@ export type InsertUser = {
     role?: string;
 };
 export type User = typeof users.$inferSelect;
+
+export type InsertOtpCode = {
+    user_id: string;
+    email: string;
+    code: string;
+    type: string;
+    expires_at: Date;
+};
+export type OtpCode = typeof otpCodes.$inferSelect;
 
 export type InsertTool = {
     toolId: string;
@@ -149,6 +194,10 @@ export const toolCategorySchema = z.enum([
     "Other"
 ]);
 export type ToolCategory = z.infer<typeof toolCategorySchema>;
+
+// OTP types
+export const otpTypeSchema = z.enum(["email_verification", "password_reset"]);
+export type OtpType = z.infer<typeof otpTypeSchema>;
 
 // Report types
 export const reportTypeSchema = z.enum([

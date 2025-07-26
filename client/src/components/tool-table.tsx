@@ -187,19 +187,19 @@ export default function ToolTable() {
     return (
         <>
             <div className="bg-white rounded-lg shadow-sm mb-6">
-                <div className="p-4 border-b border-neutral-100">
-                    <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-                        <h2 className="text-lg font-semibold">
+                <div className="p-3 sm:p-4 border-b border-neutral-100">
+                    <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-3 sm:gap-4">
+                        <h2 className="text-base sm:text-lg font-semibold">
                             Tool Inventory
                         </h2>
 
-                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 lg:gap-4">
                             {/* Status Filter */}
                             <Select
                                 value={statusFilter}
                                 onValueChange={setStatusFilter}
                             >
-                                <SelectTrigger className="w-full sm:w-[150px]">
+                                <SelectTrigger className="w-full sm:w-[140px] lg:w-[150px]">
                                     <SelectValue placeholder="All Tags" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -220,7 +220,7 @@ export default function ToolTable() {
                                 value={categoryFilter}
                                 onValueChange={setCategoryFilter}
                             >
-                                <SelectTrigger className="w-full sm:w-[180px]">
+                                <SelectTrigger className="w-full sm:w-[140px] lg:w-[180px]">
                                     <SelectValue placeholder="All Categories" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -243,11 +243,12 @@ export default function ToolTable() {
                             {/* Add Tool Button */}
                             {isAdmin && (
                                 <Button
-                                    className="bg-halliburton-red hover:bg-halliburton-red/90"
+                                    className="bg-halliburton-red hover:bg-halliburton-red/90 w-full sm:w-auto"
                                     onClick={() => setIsAddDialogOpen(true)}
                                 >
                                     <Plus className="h-4 w-4 mr-1" />
-                                    Add Tool
+                                    <span className="hidden sm:inline">Add Tool</span>
+                                    <span className="sm:hidden">Add</span>
                                 </Button>
                             )}
                         </div>
@@ -384,8 +385,8 @@ export default function ToolTable() {
 
                 {/* Pagination */}
                 {!isLoading && data?.total > 0 && (
-                    <div className="px-4 py-3 flex items-center justify-between border-t border-neutral-100 sm:px-6">
-                        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div className="px-3 sm:px-4 py-3 flex items-center justify-between border-t border-neutral-100 sm:px-6">
+                        <div className="hidden lg:flex-1 lg:flex lg:items-center lg:justify-between">
                             <div>
                                 <p className="text-sm text-neutral-500">
                                     Showing{' '}
@@ -485,11 +486,12 @@ export default function ToolTable() {
                         </div>
 
                         {/* Mobile Pagination */}
-                        <div className="flex items-center justify-between sm:hidden">
+                        <div className="flex items-center justify-between lg:hidden w-full">
                             <Button
                                 variant="outline"
                                 onClick={() => handlePageChange(page - 1)}
                                 disabled={page === 1}
+                                size="sm"
                             >
                                 Previous
                             </Button>
@@ -504,6 +506,7 @@ export default function ToolTable() {
                                 variant="outline"
                                 onClick={() => handlePageChange(page + 1)}
                                 disabled={page >= Math.ceil(data.total / limit)}
+                                size="sm"
                             >
                                 Next
                             </Button>

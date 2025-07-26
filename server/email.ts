@@ -48,7 +48,7 @@ export class EmailService {
         
         try {
             await this.transporter.sendMail({
-                from: this.fromEmail,
+                from: `"Wireline Inventory System" <${this.fromEmail}>`,
                 to: userEmail,
                 subject: template.subject,
                 text: template.text,
@@ -71,7 +71,7 @@ export class EmailService {
         
         try {
             await this.transporter.sendMail({
-                from: this.fromEmail,
+                from: `"Wireline Inventory System" <${this.fromEmail}>`,
                 to: userEmail,
                 subject: template.subject,
                 text: template.text,
@@ -93,7 +93,7 @@ export class EmailService {
         
         try {
             await this.transporter.sendMail({
-                from: this.fromEmail,
+                from: `"Wireline Inventory System" <${this.fromEmail}>`,
                 to: userEmail,
                 subject: template.subject,
                 text: template.text,
@@ -103,6 +103,52 @@ export class EmailService {
             return true;
         } catch (error) {
             console.error('Failed to send account restored email:', error);
+            return false;
+        }
+    }
+
+    async sendOtpEmail(
+        userEmail: string, 
+        userName: string, 
+        otpCode: string,
+        type: 'email_verification' | 'password_reset'
+    ): Promise<boolean> {
+        const template = this.getOtpTemplate(userName, otpCode, type);
+        
+        try {
+            await this.transporter.sendMail({
+                from: `"Wireline Inventory System" <${this.fromEmail}>`,
+                to: userEmail,
+                subject: template.subject,
+                text: template.text,
+                html: template.html
+            });
+            
+            return true;
+        } catch (error) {
+            console.error('Failed to send OTP email:', error);
+            return false;
+        }
+    }
+
+    async sendEmailVerificationSuccessEmail(
+        userEmail: string, 
+        userName: string
+    ): Promise<boolean> {
+        const template = this.getEmailVerificationSuccessTemplate(userName);
+        
+        try {
+            await this.transporter.sendMail({
+                from: `"Wireline Inventory System" <${this.fromEmail}>`,
+                to: userEmail,
+                subject: template.subject,
+                text: template.text,
+                html: template.html
+            });
+            
+            return true;
+        } catch (error) {
+            console.error('Failed to send email verification success email:', error);
             return false;
         }
     }
@@ -257,6 +303,145 @@ Wireline Inventory Management System
             </div>
             
             <p>You can continue to access your account as normal.</p>
+        </div>
+        <div class="footer">
+            <p>Wireline Inventory Management System</p>
+        </div>
+    </div>
+</body>
+</html>
+            `.trim()
+        };
+    }
+
+    private getOtpTemplate(userName: string, otpCode: string, type: 'email_verification' | 'password_reset'): EmailTemplate {
+        const isEmailVerification = type === 'email_verification';
+        const subject = isEmailVerification ? 'Verify Your Email Address' : 'Password Reset Code';
+        const title = isEmailVerification ? 'Email Verification' : 'Password Reset';
+        const message = isEmailVerification 
+            ? 'Please use the following code to verify your email address:'
+            : 'Please use the following code to reset your password:';
+        
+        return {
+            subject,
+            text: `
+Dear ${userName},
+
+${message}
+
+Verification Code: ${otpCode}
+
+This code will expire in 10 minutes.
+
+If you didn't request this, please ignore this email.
+
+Best regards,
+Wireline Inventory Management System
+            `.trim(),
+            html: `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #007bff; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background-color: #f8f9fa; }
+        .otp-code { 
+            background-color: #e9ecef;
+            border: 2px dashed #007bff;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            color: #007bff;
+        }
+        .warning { 
+            background-color: #fff3cd; 
+            border: 1px solid #ffeaa7; 
+            padding: 15px; 
+            margin: 15px 0; 
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>${title}</h1>
+        </div>
+        <div class="content">
+            <p>Dear <strong>${userName}</strong>,</p>
+            
+            <p>${message}</p>
+            
+            <div class="otp-code">${otpCode}</div>
+            
+            <div class="warning">
+                ⏰ <strong>Important:</strong> This code will expire in 10 minutes.
+            </div>
+            
+            <p>If you didn't request this, please ignore this email.</p>
+        </div>
+        <div class="footer">
+            <p>Wireline Inventory Management System</p>
+        </div>
+    </div>
+</body>
+</html>
+            `.trim()
+        };
+    }
+
+    private getEmailVerificationSuccessTemplate(userName: string): EmailTemplate {
+        return {
+            subject: 'Email Verified Successfully',
+            text: `
+Dear ${userName},
+
+Your email address has been successfully verified!
+
+You can now access all features of the Wireline Inventory Management System.
+
+Best regards,
+Wireline Inventory Management System
+            `.trim(),
+            html: `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #28a745; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background-color: #f8f9fa; }
+        .success { 
+            background-color: #d4edda; 
+            border: 1px solid #c3e6cb; 
+            padding: 15px; 
+            margin: 15px 0; 
+            border-radius: 5px; 
+        }
+        .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Email Verified</h1>
+        </div>
+        <div class="content">
+            <p>Dear <strong>${userName}</strong>,</p>
+            
+            <div class="success">
+                <strong>✅ Success:</strong> Your email address has been successfully verified!
+            </div>
+            
+            <p>You can now access all features of the Wireline Inventory Management System.</p>
         </div>
         <div class="footer">
             <p>Wireline Inventory Management System</p>

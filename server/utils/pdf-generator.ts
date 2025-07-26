@@ -284,8 +284,8 @@ function generateReportHTML(data: ReportData): string {
                 <div class="meta-section">
                     <div class="meta-title">Summary</div>
                     <div><strong>Total Tools:</strong> ${ filteredTools.length }</div>
-                    <div><strong>Categories:</strong> ${ [...new Set(filteredTools.map(t => t.category))].length }</div>
-                    <div><strong>Locations:</strong> ${ [...new Set(filteredTools.map(t => t.location).filter(Boolean))].length }</div>
+                    <div><strong>Categories:</strong> ${ Array.from(new Set(filteredTools.map(t => t.category))).length }</div>
+                    <div><strong>Locations:</strong> ${ Array.from(new Set(filteredTools.map(t => t.location).filter(Boolean))).length }</div>
                 </div>
             </div>
             
